@@ -81,9 +81,13 @@ const VendorConfirmation = () => {
       // If vendor confirmed and a transporter is assigned, trigger the transporter message
       if (status === "yes" && poData.transporter_number) {
         const confirmLink = `${window.location.origin}/transporter-confirmation/${id}`;
+        
+        let formattedPhone = poData.transporter_number.replace(/\D/g, "");
+        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+
         // Try to trigger in background so it doesn't block UI too long
         sendTransporterConfirmationMessage(
-          poData.transporter_number,
+          formattedPhone,
           poData.po_number,
           confirmLink,
           "DRINQKART",

@@ -82,9 +82,13 @@ const TransporterConfirmation = () => {
       // Trigger the receiver WhatsApp message if transporter confirms pickup
       if (status === "yes" && poData.receiver_number) {
         const confirmLink = `${window.location.origin}/receiver-confirmation/${id}`;
+        
+        let formattedPhone = poData.receiver_number.replace(/\D/g, "");
+        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+
         import("../services/whatsappService").then(({ sendReceiverConfirmationMessage }) => {
           sendReceiverConfirmationMessage(
-            poData.receiver_number,
+            formattedPhone,
             poData.po_number,
             confirmLink,
             "DRINQKART",
