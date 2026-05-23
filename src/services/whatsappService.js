@@ -104,13 +104,10 @@ TEAM MAMTA HOSPITAL`;
  * Send a WhatsApp message via Maytapi.
  *
  * @param {string} toNumber - Recipient phone number (with country code, no +)
- * @param {string} message  - Text message to send (or caption if mediaUrl is provided)
- * @param {string} mediaUrl - Optional URL of media (e.g. PDF) to send with the message
+ * @param {string} message  - Text message to send
  * @returns {Promise<boolean>} true on success, false on failure
  */
-export const sendWhatsAppMessage = async (toNumber, message, mediaUrl = null) => {
-  console.log(MAYTAPI_PRODUCT_ID, MAYTAPI_PHONE_ID, MAYTAPI_TOKEN);
-
+export const sendWhatsAppMessage = async (toNumber, message) => {
   if (!MAYTAPI_PRODUCT_ID || !MAYTAPI_PHONE_ID || !MAYTAPI_TOKEN) {
     console.warn("[WhatsApp] Maytapi credentials are not configured in .env");
     return false;
@@ -125,26 +122,17 @@ export const sendWhatsAppMessage = async (toNumber, message, mediaUrl = null) =>
         "Content-Type": "application/json",
         "x-maytapi-key": MAYTAPI_TOKEN,
       },
-      body: JSON.stringify(
-        mediaUrl 
-          ? {
-              to_number: toNumber,
-              type: "media",
-              message: mediaUrl,
-              text: message,
-            }
-          : {
-              to_number: toNumber,
-              type: "text",
-              message: message,
-            }
-      ),
+      body: JSON.stringify({
+        to_number: toNumber,
+        type: "text",
+        message: message,
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      console.error("[WhatsApp] Failed to send message:", data);
+      console.error("[WhatsApp] Failed to send text message:", data);
       return false;
     }
 
@@ -245,16 +233,16 @@ export const sendDepartmentalIndentApprovalNotification = async (
     const medicineName =
       medicines?.length > 0
         ? medicines
-            .map((item) => item.name)
-            .filter(Boolean)
-            .join(", ")
+          .map((item) => item.name)
+          .filter(Boolean)
+          .join(", ")
         : "N/A";
     const medicineQty =
       medicines?.length > 0
         ? medicines
-            .map((item) => item.quantity)
-            .filter(Boolean)
-            .join(", ")
+          .map((item) => item.quantity)
+          .filter(Boolean)
+          .join(", ")
         : "N/A";
 
     const message = `⚡ Approval Request – Departmental Medicine
@@ -330,9 +318,8 @@ export const sendDressingNotification = async (dressingData, patientData) => {
     const patientId =
       dressingData.patient_id || dressingData.patientId || dressingData.id;
     // Build the complete URL pointing to the dressing page
-    const completeUrl = `${window.location.origin}/admin/patient-profile${
-      patientId ? `/${patientId}/dressing` : ""
-    }`;
+    const completeUrl = `${window.location.origin}/admin/patient-profile${patientId ? `/${patientId}/dressing` : ""
+      }`;
 
     const message = buildDressingNotificationMessage(
       dressingData,
@@ -461,22 +448,23 @@ export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumbe
   try {
     console.log("[WhatsApp] Sending PO confirmation notification...");
 
-    const message = `📩 Purchase Order Notification
+    const message = `📩 *Purchase Order Notification*
 
 Dear *${vendorName}*,
 
-PO Number: ${poNumber}
+*PO Number:* ${poNumber}
+*Shop Name:* ${companyName || 'DRINQKART'}
+*Total Qty:* ${totalQty}
 
-Shop Name: ${companyName || 'DRINQKART'}
-
-Total Qty: ${totalQty}
-
-🔗 Action Required Link:
+🔗 *Action Required Link:*
 ${confirmLink}
 
-✅ Please click the above link to confirm the order, specify your dispatch date, or provide remarks.`;
+✅ Please click the above link to confirm the order, specify your dispatch date, or provide remarks.
 
-    const success = await sendWhatsAppMessage(phoneNumber, message, pdfUrl);
+THANKS & REGARDS
+TEAM ${companyName || 'DRINQKART'}`;
+
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] PO confirmation sent to", phoneNumber);
@@ -505,21 +493,24 @@ export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, 
   try {
     console.log("[WhatsApp] Sending Transporter confirmation notification...");
 
-    const message = `🚚 Pick-up Request Notification
+    const message = `🚚 *Pick-up Request Notification*
 
 Dear Transporter,
 
 You have a new pick-up request from *${companyName || 'DRINQKART'}*.
 
-PO Number: ${poNumber}
-Vendor Name: ${vendorName}
+*PO Number:* ${poNumber}
+*Vendor Name:* ${vendorName}
 
-🔗 Action Required Link:
+🔗 *Action Required Link:*
 ${confirmLink}
 
-✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.`;
+✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.
 
-    const success = await sendWhatsAppMessage(phoneNumber, message, pdfUrl);
+THANKS & REGARDS
+TEAM ${companyName || 'DRINQKART'}`;
+
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Transporter confirmation sent to", phoneNumber);
@@ -548,20 +539,23 @@ export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, con
   try {
     console.log("[WhatsApp] Sending Receiver confirmation notification...");
 
-    const message = `📦 Delivery Alert
+    const message = `📦 *Delivery Alert*
 
 Dear Receiver,
 
 A new delivery from *${vendorName}* is on its way to *${companyName || 'DRINQKART'}*.
 
-PO Number: ${poNumber}
+*PO Number:* ${poNumber}
 
-🔗 Action Required Link:
+🔗 *Action Required Link:*
 ${confirmLink}
 
-✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.`;
+✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.
 
-    const success = await sendWhatsAppMessage(phoneNumber, message, pdfUrl);
+THANKS & REGARDS
+TEAM ${companyName || 'DRINQKART'}`;
+
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Receiver confirmation sent to", phoneNumber);

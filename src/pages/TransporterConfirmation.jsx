@@ -30,7 +30,7 @@ const TransporterConfirmation = () => {
 
         if (err) throw err;
         setPoData(data);
-        
+
         // If already submitted previously, we block submission
         if (data.transporter_status) {
           setSubmitted(true);
@@ -83,7 +83,7 @@ const TransporterConfirmation = () => {
       if (status === "yes" && poData.receiver_number) {
         const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
         const confirmLink = `${baseUrl}/receiver-confirmation/${id}`;
-        
+
         let formattedPhone = poData.receiver_number.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
 
@@ -102,7 +102,7 @@ const TransporterConfirmation = () => {
           });
         });
       }
-      
+
       setSubmitted(true);
     } catch (err) {
       console.error("Error submitting confirmation:", err);
@@ -191,7 +191,7 @@ const TransporterConfirmation = () => {
         ) : (
           <form className="vc-form" onSubmit={handleSubmit}>
             <h3>Your Response</h3>
-            
+
             {formError && <div className="vc-error-msg">{formError}</div>}
 
             <div className="vc-form-group">
@@ -263,9 +263,9 @@ const TransporterConfirmation = () => {
               </div>
             )}
 
-            <button 
-              type="submit" 
-              className="vc-submit-btn" 
+            <button
+              type="submit"
+              className="vc-submit-btn"
               style={{ background: '#f59e0b' }}
               disabled={!status || submitting}
             >
