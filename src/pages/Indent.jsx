@@ -221,21 +221,18 @@ const Indent = () => {
           m => m.itemName.toLowerCase() === record.itemName.toLowerCase()
         );
 
-        // Only include the data if it matches an item from the master data
-        if (masterMatch) {
-          matchedRecords.push({
-            id: Date.now() + idx,
-            itemName: record.itemName,
-            avgSale: masterMatch.avgSale,
-            qtyOut: record.qtyOut,
-            closingQty: record.closingQty,
-            brandName: record.brandName,
-            bcs: record.bcs,
-            mls: record.mls,
-            liquorType: record.liquorType,
-            partyName: record.partyName || selectedShop,
-          });
-        }
+        matchedRecords.push({
+          id: Date.now() + idx,
+          itemName: record.itemName,
+          avgSale: masterMatch ? masterMatch.avgSale : 0,
+          qtyOut: record.qtyOut,
+          closingQty: record.closingQty,
+          brandName: record.brandName,
+          bcs: record.bcs,
+          mls: record.mls,
+          liquorType: record.liquorType,
+          partyName: record.partyName || selectedShop,
+        });
       });
       return matchedRecords;
     });
@@ -249,75 +246,44 @@ const Indent = () => {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
 
     setIsProcessing(true);
     setShowModal(false);
 
     // Yield to browser rendering so spinner can appear
     setTimeout(() => {
-      if (isExcel) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const data = new Uint8Array(event.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
 
-          // Score keywords we must find in a header row
-          const targetKeywords = ['party name', 'brand name', 'liquor type', 'size', 'mls', 'ml'];
+        // Score keywords we must find in a header row
+        const targetKeywords = ['party name', 'brand name', 'liquor type', 'size', 'mls', 'ml'];
 
-          let bestRows = null;
-          let bestScore = -1;
+        let bestRows = null;
+        let bestScore = -1;
 
-          for (const sheetName of workbook.SheetNames) {
-            const sheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-            // Look in first 15 rows for the best header row
-            for (let i = 0; i < Math.min(15, rows.length); i++) {
-              const row = rows[i].map(c => String(c ?? '').toLowerCase().trim());
-              const score = targetKeywords.filter(kw => row.some(h => h.includes(kw))).length;
-              if (score > bestScore) {
-                bestScore = score;
-                bestRows = rows;
-              }
+          // Look in first 15 rows for the best header row
+          for (let i = 0; i < Math.min(15, rows.length); i++) {
+            const row = rows[i].map(c => String(c ?? '').toLowerCase().trim());
+            const score = targetKeywords.filter(kw => row.some(h => h.includes(kw))).length;
+            if (score > bestScore) {
+              bestScore = score;
+              bestRows = rows;
             }
           }
+        }
 
-          console.log('[File Debug] Best sheet score:', bestScore, '— using', bestScore > 0 ? 'matched sheet' : 'first sheet');
-          processRows(bestRows ?? XLSX.utils.sheet_to_json(
-            workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' }
-          ));
-        };
-        reader.readAsArrayBuffer(file);
-      } else {
-        // Plain CSV / TSV
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const text = event.target.result;
-          const lines = text.split(/\r?\n/).filter(l => l.trim());
-          const firstLine = lines[0] || '';
-          let delimiter = ',';
-          if (firstLine.includes('\t')) delimiter = '\t';
-          else if (firstLine.includes(';')) delimiter = ';';
-          else if (firstLine.includes('|')) delimiter = '|';
-
-          const splitRow = (line) => {
-            const result = [];
-            let inQ = false, cur = '';
-            for (const c of line) {
-              if (c === '"') { inQ = !inQ; continue; }
-              if (c === delimiter && !inQ) { result.push(cur.trim()); cur = ''; continue; }
-              cur += c;
-            }
-            result.push(cur.trim());
-            return result;
-          };
-
-          const rows = lines.map(splitRow);
-          processRows(rows);
-        };
-        reader.readAsText(file);
-      }
+        console.log('[File Debug] Best sheet score:', bestScore, '— using', bestScore > 0 ? 'matched sheet' : 'first sheet');
+        processRows(bestRows ?? XLSX.utils.sheet_to_json(
+          workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' }
+        ));
+      };
+      reader.readAsArrayBuffer(file);
     }, 150);
   };
 
