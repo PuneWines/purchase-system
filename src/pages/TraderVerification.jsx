@@ -17,13 +17,23 @@ const TraderVerification = () => {
         .order("created_at", { ascending: false });
 
       if (poData) {
-        const formatted = poData.map(item => ({
-          ...item,
-          formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit"
-          })
-        }));
+        const formatted = poData.map(item => {
+          let totalReceivedQty = 0;
+          if (item.received_items && typeof item.received_items === 'object') {
+            totalReceivedQty = Object.values(item.received_items).reduce((sum, currentItem) => sum + (Number(currentItem.receivedQty) || 0), 0);
+          }
+          const diff = item.receiver_status === 'yes' ? totalReceivedQty - (Number(item.total_order_qty) || 0) : null;
+          
+          return {
+            ...item,
+            formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit"
+            }),
+            totalReceivedQty: item.receiver_status === 'yes' ? totalReceivedQty : "N/A",
+            qtyDifference: diff
+          };
+        });
         setData(formatted);
       } else if (error) {
         console.error("Error fetching POs:", error);
@@ -60,9 +70,54 @@ const TraderVerification = () => {
         </a>
       ) : <span style={{ color: '#94a3b8' }}>N/A</span>
     },
-    { key: "trader_status", label: "Trader Status", sortable: true },
+    { 
+      key: "trader_status", 
+      label: "Trader Status", 
+      sortable: true,
+      render: (status) => {
+        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Approved</span>;
+        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
+      }
+    },
     { key: "dispatch_date", label: "Dispatch Date", sortable: true },
-    { key: "remarks", label: "Remarks", sortable: false }
+    { 
+      key: "transporter_status", 
+      label: "Transporter Status", 
+      sortable: true,
+      render: (status) => {
+        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Picked-up</span>;
+        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
+      }
+    },
+    { key: "pickup_date", label: "Pick-up Date", sortable: true },
+    { key: "delivery_date", label: "Est. Delivery", sortable: true },
+    { 
+      key: "receiver_status", 
+      label: "Receiver Status", 
+      sortable: true,
+      render: (status) => {
+        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Received</span>;
+        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
+      }
+    },
+    { key: "totalReceivedQty", label: "Received Qty", sortable: true },
+    { 
+      key: "qtyDifference", 
+      label: "Difference", 
+      sortable: true,
+      render: (diff) => {
+        if (diff === null || diff === undefined) return <span>-</span>;
+        if (diff === 0) return <span style={{ color: "#16a34a", fontWeight: "600" }}>0</span>;
+        if (diff > 0) return <span style={{ color: "#f59e0b", fontWeight: "600" }}>+{diff}</span>;
+        return <span style={{ color: "#ef4444", fontWeight: "600" }}>{diff}</span>;
+      }
+    },
+    { key: "remarks", label: "Trader Remarks", sortable: false },
+    { key: "transporter_remarks", label: "Transporter Remarks", sortable: false },
+    { key: "receiver_remarks", label: "Receiver Remarks", sortable: false }
   ];
 
   return (

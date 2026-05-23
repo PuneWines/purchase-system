@@ -50,12 +50,38 @@ const Settings = () => {
   });
   const [isCompanySubmitting, setIsCompanySubmitting] = useState(false);
 
+  // Transporter Form State
+  const [transporters, setTransporters] = useState([]);
+  const [showTransporterForm, setShowTransporterForm] = useState(false);
+  const [editingTransporter, setEditingTransporter] = useState(null);
+  const [isTransporterSubmitting, setIsTransporterSubmitting] = useState(false);
+  const [transporterFormData, setTransporterFormData] = useState({ name: "", contact_number: "" });
+
+  // Receiver Form State
+  const [receivers, setReceivers] = useState([]);
+  const [showReceiverForm, setShowReceiverForm] = useState(false);
+  const [editingReceiver, setEditingReceiver] = useState(null);
+  const [isReceiverSubmitting, setIsReceiverSubmitting] = useState(false);
+  const [receiverFormData, setReceiverFormData] = useState({ name: "", contact_number: "" });
+
   useEffect(() => {
     fetchUsers();
     fetchVendors();
     fetchAvailableParties();
     fetchCompanySettings();
+    fetchTransporters();
+    fetchReceivers();
   }, [fetchUsers, fetchVendors, fetchCompanySettings]);
+
+  const fetchTransporters = async () => {
+    const { data } = await supabase.from("transporters").select("*").order("created_at", { ascending: false });
+    if (data) setTransporters(data);
+  };
+
+  const fetchReceivers = async () => {
+    const { data } = await supabase.from("receivers").select("*").order("created_at", { ascending: false });
+    if (data) setReceivers(data);
+  };
 
   useEffect(() => {
     if (companySettings) {
@@ -260,6 +286,74 @@ const Settings = () => {
     setCompanyFormData({ ...companyFormData, terms: newTerms });
   };
 
+  // --- TRANSPORTER HANDLERS ---
+  const handleEditTransporter = (t) => {
+    setEditingTransporter(t.id);
+    setTransporterFormData({ name: t.name || "", contact_number: t.contact_number || "" });
+    setShowTransporterForm(true);
+  };
+
+  const handleTransporterSubmit = async (e) => {
+    e.preventDefault();
+    setIsTransporterSubmitting(true);
+    let res;
+    if (editingTransporter) {
+      res = await supabase.from("transporters").update(transporterFormData).eq("id", editingTransporter);
+    } else {
+      res = await supabase.from("transporters").insert([transporterFormData]);
+    }
+    setIsTransporterSubmitting(false);
+
+    if (!res.error) {
+      alert(`Transporter ${editingTransporter ? "updated" : "added"} successfully!`);
+      setShowTransporterForm(false);
+      fetchTransporters();
+    } else {
+      alert(`Error: ${res.error.message}`);
+    }
+  };
+
+  const handleDeleteTransporter = async (id) => {
+    if (window.confirm("Delete this transporter?")) {
+      await supabase.from("transporters").delete().eq("id", id);
+      fetchTransporters();
+    }
+  };
+
+  // --- RECEIVER HANDLERS ---
+  const handleEditReceiver = (r) => {
+    setEditingReceiver(r.id);
+    setReceiverFormData({ name: r.name || "", contact_number: r.contact_number || "" });
+    setShowReceiverForm(true);
+  };
+
+  const handleReceiverSubmit = async (e) => {
+    e.preventDefault();
+    setIsReceiverSubmitting(true);
+    let res;
+    if (editingReceiver) {
+      res = await supabase.from("receivers").update(receiverFormData).eq("id", editingReceiver);
+    } else {
+      res = await supabase.from("receivers").insert([receiverFormData]);
+    }
+    setIsReceiverSubmitting(false);
+
+    if (!res.error) {
+      alert(`Receiver ${editingReceiver ? "updated" : "added"} successfully!`);
+      setShowReceiverForm(false);
+      fetchReceivers();
+    } else {
+      alert(`Error: ${res.error.message}`);
+    }
+  };
+
+  const handleDeleteReceiver = async (id) => {
+    if (window.confirm("Delete this receiver?")) {
+      await supabase.from("receivers").delete().eq("id", id);
+      fetchReceivers();
+    }
+  };
+
   return (
     <div className="page-container">
       <h1>Settings</h1>
@@ -285,6 +379,18 @@ const Settings = () => {
           onClick={() => setActiveTab('company')}
         >
           Company Profile
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'transporters' ? 'active' : ''}`}
+          onClick={() => setActiveTab('transporters')}
+        >
+          Transporters
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'receivers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('receivers')}
+        >
+          Receivers
         </button>
       </div>
 
@@ -715,6 +821,170 @@ const Settings = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'transporters' && (
+          <>
+            <div className="section-header">
+              <h2>Transporter Management</h2>
+              <button className="btn-primary" onClick={() => {
+                setEditingTransporter(null);
+                setTransporterFormData({ name: "", contact_number: "" });
+                setShowTransporterForm(true);
+              }}>
+                + Add Transporter
+              </button>
+            </div>
+
+            {showTransporterForm && (
+              <div className="user-form-container">
+                <h3>{editingTransporter ? "Edit Transporter" : "Add Transporter"}</h3>
+                <form onSubmit={handleTransporterSubmit} className="user-form">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Name *</label>
+                      <input
+                        type="text"
+                        value={transporterFormData.name}
+                        onChange={(e) => setTransporterFormData({ ...transporterFormData, name: e.target.value })}
+                        required
+                        disabled={isTransporterSubmitting}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Contact Number *</label>
+                      <input
+                        type="text"
+                        value={transporterFormData.contact_number}
+                        onChange={(e) => setTransporterFormData({ ...transporterFormData, contact_number: e.target.value })}
+                        required
+                        disabled={isTransporterSubmitting}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-actions">
+                    <button type="submit" className="btn-primary" disabled={isTransporterSubmitting}>
+                      {isTransporterSubmitting ? "Saving..." : "Save Transporter"}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={() => setShowTransporterForm(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="users-table-container">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Contact Number</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transporters.map((t) => (
+                    <tr key={t.id}>
+                      <td><strong>{t.name}</strong></td>
+                      <td>{t.contact_number}</td>
+                      <td>
+                        <button className="btn-edit" onClick={() => handleEditTransporter(t)}>Edit</button>
+                        <button className="btn-delete" onClick={() => handleDeleteTransporter(t.id)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {transporters.length === 0 && (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center' }}>No transporters found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'receivers' && (
+          <>
+            <div className="section-header">
+              <h2>Receiver Management</h2>
+              <button className="btn-primary" onClick={() => {
+                setEditingReceiver(null);
+                setReceiverFormData({ name: "", contact_number: "" });
+                setShowReceiverForm(true);
+              }}>
+                + Add Receiver
+              </button>
+            </div>
+
+            {showReceiverForm && (
+              <div className="user-form-container">
+                <h3>{editingReceiver ? "Edit Receiver" : "Add Receiver"}</h3>
+                <form onSubmit={handleReceiverSubmit} className="user-form">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Name *</label>
+                      <input
+                        type="text"
+                        value={receiverFormData.name}
+                        onChange={(e) => setReceiverFormData({ ...receiverFormData, name: e.target.value })}
+                        required
+                        disabled={isReceiverSubmitting}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Contact Number *</label>
+                      <input
+                        type="text"
+                        value={receiverFormData.contact_number}
+                        onChange={(e) => setReceiverFormData({ ...receiverFormData, contact_number: e.target.value })}
+                        required
+                        disabled={isReceiverSubmitting}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-actions">
+                    <button type="submit" className="btn-primary" disabled={isReceiverSubmitting}>
+                      {isReceiverSubmitting ? "Saving..." : "Save Receiver"}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={() => setShowReceiverForm(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            <div className="users-table-container">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Contact Number</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receivers.map((r) => (
+                    <tr key={r.id}>
+                      <td><strong>{r.name}</strong></td>
+                      <td>{r.contact_number}</td>
+                      <td>
+                        <button className="btn-edit" onClick={() => handleEditReceiver(r)}>Edit</button>
+                        <button className="btn-delete" onClick={() => handleDeleteReceiver(r.id)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {receivers.length === 0 && (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center' }}>No receivers found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </>
         )}

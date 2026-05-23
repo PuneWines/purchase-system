@@ -14,6 +14,8 @@ import MasterItem from "./pages/MasterItem";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import VendorConfirmation from "./pages/VendorConfirmation";
+import TransporterConfirmation from "./pages/TransporterConfirmation";
+import ReceiverConfirmation from "./pages/ReceiverConfirmation";
 import useAuthStore from "./store/useAuthStore";
 import "./App.css";
 
@@ -43,6 +45,8 @@ const AppContent = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
+          <Route path="/transporter-confirmation/:id" element={<TransporterConfirmation />} />
+          <Route path="/receiver-confirmation/:id" element={<ReceiverConfirmation />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />

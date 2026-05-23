@@ -342,6 +342,68 @@
   justify-content: center;
 }
 
+/* ── Shipping Details ──────────────────────────────────────── */
+.po-shipping-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.shipping-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shipping-field strong {
+  font-size: 0.875rem;
+  color: var(--color-text-main);
+}
+
+.shipping-select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-default);
+  font-family: var(--font-primary);
+  font-size: 0.875rem;
+  color: var(--color-text-main);
+  background-color: var(--color-surface);
+  min-width: 200px;
+  outline: none;
+  cursor: pointer;
+}
+
+.shipping-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.2);
+}
+
+.shipping-error-msg {
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px;
+  border-radius: var(--radius-default);
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.highlight-error {
+  animation: pulse-red 2s ease;
+  border-radius: var(--radius-default);
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
 /* Print */
 @media print {
   @page {
@@ -391,6 +453,11 @@
   }
   .searchable-dropdown svg { display: none !important; }
   .searchable-dropdown > div:nth-child(2) { display: none !important; }
+  
+  /* Hide shipping dropdowns completely in Print */
+  .po-shipping-details { 
+    display: none !important; 
+  }
 }
 
 /* ============================================================
@@ -405,6 +472,10 @@
   border: none !important;
   box-shadow: none !important;
   overflow: visible !important;
+}
+
+.po-document.pdf-export .po-shipping-details {
+  display: none !important;
 }
 
 .po-document.pdf-export .po-items-table th,

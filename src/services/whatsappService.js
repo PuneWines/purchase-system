@@ -490,3 +490,88 @@ ${confirmLink}
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Send the transporter confirmation message
+ * 
+ * @param {string} phoneNumber - Transporter's phone number
+ * @param {string} poNumber - PO Number
+ * @param {string} confirmLink - Confirmation Link
+ * @param {string} companyName - Company/Shop Name
+ * @param {string} vendorName - Vendor name
+ * @param {string} pdfUrl - URL of the generated PO PDF
+ */
+export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
+  try {
+    console.log("[WhatsApp] Sending Transporter confirmation notification...");
+
+    const message = `🚚 Pick-up Request Notification
+
+Dear Transporter,
+
+You have a new pick-up request from *${companyName || 'DRINQKART'}*.
+
+PO Number: ${poNumber}
+Vendor Name: ${vendorName}
+
+🔗 Action Required Link:
+${confirmLink}
+
+✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.`;
+
+    const success = await sendWhatsAppMessage(phoneNumber, message, pdfUrl);
+
+    if (success) {
+      console.log("[WhatsApp] Transporter confirmation sent to", phoneNumber);
+    } else {
+      console.warn("[WhatsApp] Failed to send Transporter confirmation to", phoneNumber);
+    }
+
+    return { success };
+  } catch (error) {
+    console.error("[WhatsApp] sendTransporterConfirmationMessage error:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send the receiver confirmation message
+ * 
+ * @param {string} phoneNumber - Receiver's phone number
+ * @param {string} poNumber - PO Number
+ * @param {string} confirmLink - Confirmation Link
+ * @param {string} companyName - Company/Shop Name
+ * @param {string} vendorName - Vendor name
+ * @param {string} pdfUrl - URL of the generated PO PDF
+ */
+export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
+  try {
+    console.log("[WhatsApp] Sending Receiver confirmation notification...");
+
+    const message = `📦 Delivery Alert
+
+Dear Receiver,
+
+A new delivery from *${vendorName}* is on its way to *${companyName || 'DRINQKART'}*.
+
+PO Number: ${poNumber}
+
+🔗 Action Required Link:
+${confirmLink}
+
+✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.`;
+
+    const success = await sendWhatsAppMessage(phoneNumber, message, pdfUrl);
+
+    if (success) {
+      console.log("[WhatsApp] Receiver confirmation sent to", phoneNumber);
+    } else {
+      console.warn("[WhatsApp] Failed to send Receiver confirmation to", phoneNumber);
+    }
+
+    return { success };
+  } catch (error) {
+    console.error("[WhatsApp] sendReceiverConfirmationMessage error:", error);
+    return { success: false, error: error.message };
+  }
+};

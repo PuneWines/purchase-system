@@ -133,7 +133,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
 };
 
 /* ── Sub-component: single PO document ─────────────────────── */
-const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDate, dbParties = [], onPartyChange, vendorDetails, companyInfo, companyTerms }) => {
+const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDate, dbParties = [], onPartyChange, vendorDetails, companyInfo, companyTerms, transporters = [], receivers = [], selectedTransporter, setSelectedTransporter, selectedReceiver, setSelectedReceiver, shippingError }) => {
   const orderQtyRows = items.map((item, i) => {
     const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : null;
     const bcs      = item.bcs      !== null       ? parseFloat(item.bcs)      : null;
@@ -306,6 +306,47 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
         </div>
       </div>
 
+      {/* ── Shipping Details (Transporter & Receiver) ───────── */}
+      <div className="po-shipping-details" id={`shipping-details-${id}`}>
+        {shippingError && <div className="shipping-error-msg">{shippingError}</div>}
+        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
+          <div className="shipping-field">
+            <strong>Transporter: <span style={{color: 'red'}}>*</span></strong>
+            <select 
+              className="shipping-select" 
+              value={selectedTransporter} 
+              onChange={(e) => {
+                setSelectedTransporter?.(e.target.value);
+                const el = document.getElementById(`shipping-details-${id}`);
+                if (el) el.classList.remove('highlight-error');
+              }}
+            >
+            <option value="">Select Transporter</option>
+            {transporters.map((t) => (
+              <option key={t.id} value={t.contact_number}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+          <div className="shipping-field">
+            <strong>Receiver: <span style={{color: 'red'}}>*</span></strong>
+            <select 
+              className="shipping-select" 
+              value={selectedReceiver} 
+              onChange={(e) => {
+                setSelectedReceiver?.(e.target.value);
+                const el = document.getElementById(`shipping-details-${id}`);
+                if (el) el.classList.remove('highlight-error');
+              }}
+            >
+            <option value="">Select Receiver</option>
+            {receivers.map((r) => (
+              <option key={r.id} value={r.contact_number}>{r.name}</option>
+            ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 };
@@ -322,6 +363,11 @@ const PurchaseOrder = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [nextPoNumber, setNextPoNumber] = useState("");
+  const [transporters, setTransporters] = useState([]);
+  const [receivers, setReceivers] = useState([]);
+  const [selectedTransporter, setSelectedTransporter] = useState("");
+  const [selectedReceiver, setSelectedReceiver] = useState("");
+  const [shippingError, setShippingError] = useState("");
   const printRef = useRef();
 
   const fetchNextPoNumber = async () => {
@@ -364,6 +410,18 @@ const PurchaseOrder = () => {
   }, [approvedItems, activeParty]);
 
   const handleDownloadPDF = async () => {
+    if (!selectedTransporter || !selectedReceiver) {
+      setShippingError("Please select both Transporter and Receiver before generating the PO.");
+      const shippingSection = document.getElementById('shipping-details-pdf-trader');
+      if (shippingSection) {
+        shippingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        shippingSection.classList.add('highlight-error');
+        setTimeout(() => shippingSection.classList.remove('highlight-error'), 2500);
+      }
+      return;
+    }
+    setShippingError("");
+
     const docTrader = document.getElementById('pdf-trader');
     const docReceiver = document.getElementById('pdf-receiver');
     const receiverContainer = document.getElementById('receiver-pdf-container');
@@ -489,7 +547,9 @@ const PurchaseOrder = () => {
           indent_id: currentIndentId,
           first_brand_name: firstBrandName,
           total_order_qty: totalOrderQty,
-          total_order_box: totalOrderBox
+          total_order_box: totalOrderBox,
+          transporter_number: selectedTransporter || null,
+          receiver_number: selectedReceiver || null
         }])
         .select();
 
@@ -575,6 +635,14 @@ const PurchaseOrder = () => {
         setVendorsList(vendorsData);
       }
 
+      // Fetch transporters
+      const { data: transpData } = await supabase.from("transporters").select("*").order("created_at", { ascending: false });
+      if (transpData) setTransporters(transpData);
+
+      // Fetch receivers
+      const { data: recvData } = await supabase.from("receivers").select("*").order("created_at", { ascending: false });
+      if (recvData) setReceivers(recvData);
+
       if (!indentError && indentData) {
         setApprovedItems(indentData);
         
@@ -650,6 +718,13 @@ const PurchaseOrder = () => {
             vendorDetails={activeVendorDetails}
             companyInfo={companySettings}
             companyTerms={companySettings?.terms || []}
+            transporters={transporters}
+            receivers={receivers}
+            selectedTransporter={selectedTransporter}
+            setSelectedTransporter={setSelectedTransporter}
+            selectedReceiver={selectedReceiver}
+            setSelectedReceiver={setSelectedReceiver}
+            shippingError={shippingError}
           />
           
           {/* Receiver PDF is visually hidden from UI but available for export */}
@@ -667,6 +742,13 @@ const PurchaseOrder = () => {
               vendorDetails={activeVendorDetails}
               companyInfo={companySettings}
               companyTerms={companySettings?.terms || []}
+              transporters={transporters}
+              receivers={receivers}
+              selectedTransporter={selectedTransporter}
+              setSelectedTransporter={setSelectedTransporter}
+              selectedReceiver={selectedReceiver}
+              setSelectedReceiver={setSelectedReceiver}
+              shippingError={shippingError}
             />
           </div>
         </div>
