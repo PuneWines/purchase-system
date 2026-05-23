@@ -80,7 +80,7 @@ const VendorConfirmation = () => {
       
       // If vendor confirmed and a transporter is assigned, trigger the transporter message
       if (status === "yes" && poData.transporter_number) {
-        const confirmLink = `${window.location.origin}/transporter-confirmation/${id}`;
+        const confirmLink = `https://porinqkart-4w1q675om-drinkcarts-projects.vercel.app/transporter-confirmation/${id}`;
         
         let formattedPhone = poData.transporter_number.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
