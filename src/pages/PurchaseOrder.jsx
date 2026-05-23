@@ -559,7 +559,7 @@ const PurchaseOrder = () => {
 
       // --- Send WhatsApp Message ---
       if (activeVendorDetails?.contact && insertedPoId) {
-        const baseUrl = "https://porinqkart-4w1q675om-drinkcarts-projects.vercel.app";
+        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
         const confirmLink = `${baseUrl}/confirm-po/${insertedPoId}`;
         // Use the new whatsappService
         let formattedPhone = activeVendorDetails.contact.replace(/\D/g, "");

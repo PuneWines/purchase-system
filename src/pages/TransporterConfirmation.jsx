@@ -81,7 +81,8 @@ const TransporterConfirmation = () => {
 
       // Trigger the receiver WhatsApp message if transporter confirms pickup
       if (status === "yes" && poData.receiver_number) {
-        const confirmLink = `https://porinqkart-4w1q675om-drinkcarts-projects.vercel.app/receiver-confirmation/${id}`;
+        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+        const confirmLink = `${baseUrl}/receiver-confirmation/${id}`;
         
         let formattedPhone = poData.receiver_number.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
