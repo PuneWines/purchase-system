@@ -1,0 +1,392 @@
+/* ============================================================
+   PurchaseOrder.css — Enterprise Industrial PO Document UI
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --font-primary: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-border: #dfe1e6;
+  --color-border-dark: #c1c7d0;
+  --color-primary: #0052cc; /* Enterprise Blue */
+  --color-primary-dark: #0747a6;
+  --color-text-main: #172b4d;
+  --color-text-muted: #5e6c84;
+  --color-table-head: #fafbfc;
+  --radius-default: 4px;
+  --shadow-default: 0 1px 1px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+}
+
+.po-page {
+  padding: 24px;
+  background: var(--color-bg);
+  min-height: 100vh;
+  font-family: var(--font-primary);
+  color: var(--color-text-main);
+}
+
+/* ── Top bar ────────────────────────────────────────── */
+.po-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  box-shadow: var(--shadow-default);
+}
+
+.po-topbar-left h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.po-topbar-left p {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.po-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-default);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  background: var(--color-surface);
+  color: var(--color-text-main);
+  border: 1px solid var(--color-border-dark);
+  transition: background 0.15s ease;
+}
+
+.po-btn-secondary:hover {
+  background: #ebecf0;
+}
+
+.po-btn-secondary:active {
+  background: #dfe1e6;
+}
+
+/* ── Document Shell ────────────────────────────────────────── */
+.po-document {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-default);
+  padding: 32px;
+  margin-bottom: 24px;
+  width: 100%;
+  max-width: 1280px; /* Utilizes more horizontal space */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Header Area ───────────────────────────────────────────── */
+.po-header-area {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  border-bottom: 3px solid var(--color-primary);
+  padding-bottom: 12px;
+}
+
+.po-logo-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.po-logo-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-radius: var(--radius-default);
+}
+
+.po-company-info h2 {
+  margin: 0 0 2px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+.po-company-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+.po-header-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.po-header-right h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+.po-meta-table {
+  display: inline-table;
+  text-align: left;
+  font-size: 0.875rem;
+  margin-left: auto;
+  border-collapse: collapse;
+}
+
+.po-meta-table td {
+  padding: 4px 16px 4px 0;
+}
+
+.po-meta-table td:first-child {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.po-meta-table td:last-child {
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+/* ── Header Boxes ─────────────────────────────────────── */
+.po-boxes-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.po-box {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-default);
+  overflow: hidden;
+}
+
+.po-box-header {
+  background: var(--color-table-head);
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-main);
+  text-transform: uppercase;
+}
+
+.po-box-body {
+  padding: 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-main);
+  line-height: 1.5;
+}
+
+.po-box-body strong {
+  font-weight: 600;
+}
+
+/* ── Table ─────────────────────────────────────────────────── */
+.po-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  border: 1px solid var(--color-border);
+}
+
+.po-items-table th,
+.po-items-table td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.po-items-table th {
+  background: var(--color-table-head);
+  font-weight: 600;
+  color: var(--color-text-main);
+  text-align: left;
+}
+
+.po-items-table tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.po-text-right {
+  text-align: right !important;
+}
+
+.po-text-center {
+  text-align: center !important;
+}
+
+/* ── Totals ────────────────────────────────────────────────── */
+.po-totals-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 32px;
+}
+
+.po-totals-table {
+  border-collapse: collapse;
+  width: 320px;
+  border: 2px solid var(--color-border-dark);
+}
+
+.po-totals-table td {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+}
+
+.po-totals-table td:first-child {
+  font-weight: 600;
+  color: var(--color-text-main);
+  background: var(--color-table-head);
+  text-align: left;
+  width: 50%;
+}
+
+.po-totals-table td:last-child {
+  text-align: right;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+.po-footer-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 32px;
+}
+
+.po-terms-block {
+  flex: 1;
+  padding-right: 48px;
+}
+
+.po-terms-block h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  text-transform: uppercase;
+}
+
+.po-terms-block ol {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.po-terms-block li {
+  margin-bottom: 4px;
+}
+
+.po-signature-block {
+  width: 240px;
+  text-align: center;
+}
+
+.po-signature-body {
+  height: 80px;
+  border-bottom: 1px solid var(--color-text-main);
+  margin-bottom: 8px;
+}
+
+.po-signature-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.po-signature-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.po-empty {
+  text-align: center;
+  padding: 64px 20px;
+  background: var(--color-surface);
+  border-radius: var(--radius-default);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-default);
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Print */
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm; /* Reduced margin to maximize space */
+  }
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+    zoom: 0.85; /* Scales the entire document down to fit more on one page */
+  }
+  .po-page { background: #fff !important; padding: 0 !important; min-height: auto !important; }
+  .po-topbar { display: none !important; }
+  .po-document { 
+    box-shadow: none !important; 
+    border: none !important; 
+    padding: 0 !important; 
+    margin: 0 !important; 
+    page-break-after: auto; 
+    page-break-inside: avoid;
+    max-width: 100% !important; 
+  }
+
+  /* Compress some margins just for print to save vertical space */
+  .po-header-area { margin-bottom: 20px; padding-bottom: 12px; }
+  .po-boxes-row { margin-bottom: 16px; }
+  .po-items-table { margin-bottom: 16px; }
+  .po-totals-container { margin-bottom: 16px; }
+  .po-footer-section { margin-top: 20px; padding-top: 16px; }
+
+  /* Ensure rows do not break across pages if possible */
+  .po-items-table tr {
+    page-break-inside: avoid;
+  }
+  
+  .po-box-header { background: var(--color-table-head) !important; }
+  .po-items-table th { background: var(--color-table-head) !important; }
+  .po-totals-table td:first-child { background: var(--color-table-head) !important; }
+
+  /* Make searchable dropdown look like plain text */
+  .searchable-dropdown > div {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .searchable-dropdown svg { display: none !important; }
+  .searchable-dropdown > div:nth-child(2) { display: none !important; }
+}
