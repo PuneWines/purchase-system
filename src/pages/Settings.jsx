@@ -528,7 +528,7 @@ const Settings = () => {
                     </div>
                   </div>
 
-                  <div className="form-group" style={{ flexDirection: 'column' }}>
+                  <div className="form-group">
                     <label>Address</label>
                     <textarea
                       value={vendorFormData.address}
@@ -537,14 +537,6 @@ const Settings = () => {
                       }
                       disabled={isVendorSubmitting}
                       rows="3"
-                      style={{
-                        padding: '0.85rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        fontFamily: 'inherit',
-                        fontSize: '0.9rem',
-                        background: 'var(--glass-bg)'
-                      }}
                     />
                   </div>
 
@@ -667,7 +659,7 @@ const Settings = () => {
                   </div>
                 </div>
 
-                <div className="form-group" style={{ flexDirection: 'column' }}>
+                <div className="form-group">
                   <label>Company Address *</label>
                   <textarea
                     value={companyFormData.address}
@@ -675,64 +667,39 @@ const Settings = () => {
                     required
                     disabled={isCompanySubmitting}
                     rows="2"
-                    style={{
-                      padding: '0.85rem',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontFamily: 'inherit',
-                      fontSize: '0.9rem',
-                      background: 'var(--glass-bg)'
-                    }}
                   />
                 </div>
 
-                <div style={{ marginTop: '2rem', marginBottom: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ margin: 0 }}>Terms and Conditions</h3>
+                <div className="terms-section">
+                  <div className="terms-header">
+                    <h3>Terms and Conditions</h3>
                     <button 
                       type="button" 
-                      className="btn-secondary" 
+                      className="btn-secondary btn-sm" 
                       onClick={handleAddTerm}
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <Plus size={14} /> Add Term
                     </button>
                   </div>
                   
                   {companyFormData.terms.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.9rem', fontStyle: 'italic' }}>No terms added yet.</p>
+                    <p className="empty-state">No terms added yet.</p>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className="terms-list">
                       {companyFormData.terms.map((term, index) => (
-                        <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                          <span style={{ marginTop: '10px', color: '#64748b', fontWeight: 600 }}>{index + 1}.</span>
+                        <div key={index} className="term-item">
+                          <span className="term-number">{index + 1}.</span>
                           <textarea
                             value={term}
                             onChange={(e) => handleTermChange(index, e.target.value)}
                             disabled={isCompanySubmitting}
                             rows="2"
-                            style={{
-                              flex: 1,
-                              padding: '0.6rem',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              fontFamily: 'inherit',
-                              fontSize: '0.9rem',
-                              background: 'var(--glass-bg)'
-                            }}
                           />
                           <button
                             type="button"
+                            className="btn-icon-danger"
                             onClick={() => handleRemoveTerm(index)}
                             disabled={isCompanySubmitting}
-                            style={{
-                              background: 'none', border: 'none', color: '#ef4444', 
-                              cursor: 'pointer', padding: '8px', marginTop: '2px',
-                              borderRadius: '4px', display: 'flex', alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
                           >
                             <Trash2 size={18} />
                           </button>

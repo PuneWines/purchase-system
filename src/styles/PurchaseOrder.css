@@ -180,12 +180,14 @@
   flex: 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-default);
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden so dropdown doesn't get clipped */
 }
 
 .po-box-header {
   background: var(--color-table-head);
   border-bottom: 1px solid var(--color-border);
+  border-top-left-radius: calc(var(--radius-default) - 1px);
+  border-top-right-radius: calc(var(--radius-default) - 1px);
   padding: 8px 12px;
   font-weight: 600;
   font-size: 0.85rem;
@@ -389,4 +391,39 @@
   }
   .searchable-dropdown svg { display: none !important; }
   .searchable-dropdown > div:nth-child(2) { display: none !important; }
+}
+
+/* ============================================================
+   PDF Export Mode (Applied dynamically via JS)
+   ============================================================ */
+.po-document.pdf-export {
+  width: 1000px !important;
+  min-width: 1000px !important;
+  max-width: 1000px !important;
+  margin: 0 !important;
+  padding: 20px !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.po-document.pdf-export .po-items-table th,
+.po-document.pdf-export .po-items-table td {
+  padding: 6px 10px !important;
+  font-size: 0.8rem !important; /* legible font size for multi-page */
+}
+
+.po-document.pdf-export .po-box-body,
+.po-document.pdf-export .po-meta-table,
+.po-document.pdf-export .po-terms-block ol {
+  font-size: 0.8rem !important;
+}
+
+.po-document.pdf-export .po-header-right h1 {
+  font-size: 1.25rem !important;
+}
+
+.po-document.pdf-export .po-totals-table td {
+  padding: 8px 14px !important;
+  font-size: 0.85rem !important;
 }

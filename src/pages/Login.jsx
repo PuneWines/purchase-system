@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import useAuthStore from "../store/useAuthStore";
 import "../styles/Login.css";
 
@@ -9,12 +9,15 @@ const Login = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const { login, currentUser, loading } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  const from = location.state?.from?.pathname || "/dashboard";
 
   useEffect(() => {
     if (currentUser) {
-      navigate("/dashboard");
+      navigate(from, { replace: true });
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, from]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +32,7 @@ const Login = () => {
     if (!res.success) {
       setErrorMsg(res.error);
     } else {
-      navigate("/dashboard");
+      navigate(from, { replace: true });
     }
   };
 

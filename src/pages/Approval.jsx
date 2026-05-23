@@ -92,7 +92,10 @@ const Approval = () => {
       const promises = itemsToUpdate.map(item => 
         supabase
           .from("indent_items")
-          .update({ approval_status: indentStatuses[item.id] })
+          .update({ 
+            approval_status: indentStatuses[item.id],
+            unique_indent_id: selectedIndentId
+          })
           .eq("id", item.id)
       );
 
@@ -228,7 +231,7 @@ const Approval = () => {
                 <tr>
                   <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
                   <th style={thStyle}>Indent ID</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                  {activeTab === 'history' && <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>}
                   <th style={thStyle}>Party Name</th>
                   <th style={thStyle}>1st Item Name</th>
                   <th style={thStyle}>1st Brand Name</th>
@@ -249,34 +252,64 @@ const Approval = () => {
                       <button 
                         onClick={(e) => { e.stopPropagation(); setSelectedIndentId(indentId); }}
                         style={{
-                          background: 'transparent',
+                          position: 'relative',
+                          background: '#e0e7ff', // Soft indigo background
                           border: 'none',
-                          color: '#4f46e5',
+                          color: '#4338ca', // Darker indigo text
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: '6px'
+                          padding: '6px 16px',
+                          borderRadius: '6px',
+                          fontWeight: '600',
+                          fontSize: '13px',
+                          transition: 'background-color 0.2s'
                         }}
-                        title="View Details"
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#c7d2fe'} // Slightly darker soft indigo on hover
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e0e7ff'}
+                        title={activeTab === 'pending' ? "Update items" : "View items"}
                       >
-                        <Eye size={18} />
+                        {activeTab === 'pending' ? 'Update' : 'View'}
+                        {activeTab === 'pending' && (
+                          <span style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            backgroundColor: '#fee2e2', // Soft red/pink background
+                            color: '#dc2626', // Darker red text
+                            borderRadius: '50%',
+                            width: '20px',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            border: '1px solid #fca5a5' // Subtle border for definition
+                          }}>
+                            {items.length}
+                          </span>
+                        )}
                       </button>
                     </td>
                     <td style={{ ...tdStyle, color: '#4338ca', fontWeight: '600' }}>{indentId}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontWeight: '600', fontSize: '12px' }} title="Approved">
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 2px #dcfce7' }}></span>
-                          {items.filter(i => indentStatuses[i.id] === 'approved').length}
+                    {activeTab === 'history' && (
+                      <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontWeight: '600', fontSize: '12px' }} title="Approved">
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 2px #dcfce7' }}></span>
+                            {items.filter(i => indentStatuses[i.id] === 'approved').length}
+                          </div>
+                          <div style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0' }}></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', fontWeight: '600', fontSize: '12px' }} title="Rejected">
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 0 2px #fee2e2' }}></span>
+                            {items.filter(i => indentStatuses[i.id] === 'rejected').length}
+                          </div>
                         </div>
-                        <div style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0' }}></div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', fontWeight: '600', fontSize: '12px' }} title="Rejected">
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 0 2px #fee2e2' }}></span>
-                          {items.filter(i => indentStatuses[i.id] === 'rejected').length}
-                        </div>
-                      </div>
-                    </td>
+                      </td>
+                    )}
                     <td style={tdStyle}>{items[0]?.party_name || "-"}</td>
                     <td style={tdStyle}>{items[0]?.item_name || "-"}</td>
                     <td style={tdStyle}>{items[0]?.brand_name || "-"}</td>

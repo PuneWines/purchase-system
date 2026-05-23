@@ -12,9 +12,9 @@ input, select, textarea, button {
 }
 
 :root {
-  --primary-color: #58cc02;
-  --primary-dark: #4aa001;
-  --primary-light: #7ee530;
+  --primary-color: #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-light: #818cf8;
   --secondary-color: #64748b;
   --success-color: #10b981;
   --warning-color: #f59e0b;

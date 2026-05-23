@@ -13,6 +13,7 @@ import Receiving from "./pages/Receiving";
 import MasterItem from "./pages/MasterItem";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
+import VendorConfirmation from "./pages/VendorConfirmation";
 import useAuthStore from "./store/useAuthStore";
 import "./App.css";
 
@@ -41,6 +42,7 @@ const AppContent = () => {
       <main className={`main-content ${!currentUser ? 'full-width' : ''}`}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />

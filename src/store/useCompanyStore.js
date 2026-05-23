@@ -15,10 +15,30 @@ const useCompanyStore = create((set, get) => ({
   },
 
   updateCompanySettings: async (settingsData) => {
-    const currentSettings = get().companySettings;
+    // First, strictly check the database to see if a company profile already exists
+    // This prevents multiple inserts if local state was stale or null
+    const { data: existingData } = await supabase
+      .from('company_settings')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
     
-    // If no settings exist yet, we insert
-    if (!currentSettings) {
+    if (existingData && existingData.id) {
+      // A profile exists, STRICTLY UPDATE the existing row
+      const { data, error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', existingData.id)
+        .select()
+        .single();
+        
+      if (!error && data) {
+        set({ companySettings: data });
+        return { success: true };
+      }
+      return { success: false, error: error?.message };
+    } else {
+      // No profile exists in the database at all, so we insert the FIRST one
       const { data, error } = await supabase
         .from('company_settings')
         .insert([settingsData])
@@ -31,20 +51,6 @@ const useCompanyStore = create((set, get) => ({
       }
       return { success: false, error: error?.message };
     }
-
-    // Otherwise update
-    const { data, error } = await supabase
-      .from('company_settings')
-      .update(settingsData)
-      .eq('id', currentSettings.id)
-      .select()
-      .single();
-      
-    if (!error && data) {
-      set({ companySettings: data });
-      return { success: true };
-    }
-    return { success: false, error: error?.message };
   }
 }));
 

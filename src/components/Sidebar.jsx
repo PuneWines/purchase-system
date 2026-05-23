@@ -25,30 +25,30 @@ const menuGroups = [
   {
     label: "Overview",
     items: [
-      { key: "dashboard", label: "Dashboard",  icon: <LayoutDashboard size={18} />, path: "/dashboard" },
+      { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/dashboard" },
     ],
   },
   {
     label: "Procurement",
     items: [
-      { key: "indent",   label: "Indent",         icon: <FileText size={18} />,   path: "/indent"   },
-      { key: "approval", label: "Approval",        icon: <CheckSquare size={18} />, path: "/approval" },
-      { key: "po",       label: "Purchase Order",  icon: <Package size={18} />,    path: "/po"       },
+      { key: "indent", label: "Indent", icon: <FileText size={18} />, path: "/indent" },
+      { key: "approval", label: "Approval", icon: <CheckSquare size={18} />, path: "/approval" },
+      { key: "po", label: "PO", icon: <Package size={18} />, path: "/po" },
     ],
   },
   {
     label: "Verification",
     items: [
-      { key: "trader_verification",      label: "Trader",      icon: <UserCheck size={18} />, path: "/trader_verification"      },
-      { key: "transporter_verification", label: "Transporter", icon: <Truck size={18} />,     path: "/transporter_verification" },
-      { key: "receiving",                label: "Receiving",   icon: <Inbox size={18} />,     path: "/receiving"                },
+      { key: "trader_verification", label: "Trader", icon: <UserCheck size={18} />, path: "/trader_verification" },
+      { key: "transporter_verification", label: "Transporter", icon: <Truck size={18} />, path: "/transporter_verification" },
+      { key: "receiving", label: "Receiving", icon: <Inbox size={18} />, path: "/receiving" },
     ],
   },
   {
     label: "Admin",
     items: [
       { key: "master_item", label: "Master Items", icon: <ClipboardList size={18} />, path: "/master_item" },
-      { key: "setting",     label: "Settings",     icon: <Settings size={18} />,      path: "/setting"     },
+      { key: "setting", label: "Settings", icon: <Settings size={18} />, path: "/setting" },
     ],
   },
 ];
@@ -138,8 +138,8 @@ const Sidebar = () => {
 
       {/* ── Footer / Logout ──────────────────────────────── */}
       <div className="sidebar-footer">
-        <button 
-          className="logout-btn" 
+        <button
+          className="logout-btn"
           onClick={logout}
           onMouseEnter={(e) => handleMouseEnter(e, "Logout")}
           onMouseLeave={handleMouseLeave}

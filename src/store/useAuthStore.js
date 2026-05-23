@@ -1,8 +1,17 @@
 import { create } from "zustand";
 import { supabase } from "../../utils/supabase";
 
+const getInitialUser = () => {
+  try {
+    const storedUser = localStorage.getItem('currentUser');
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const useAuthStore = create((set, get) => ({
-  currentUser: null,
+  currentUser: getInitialUser(),
   users: [],
   loading: false,
 
