@@ -37,12 +37,12 @@ const Indent = () => {
           indent_items ( id )
         `)
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         addToast("Error fetching history: " + error.message, "error");
         throw error;
       }
-      
+
       const historyData = (data || []).map(row => ({
         ...row,
         itemCount: row.indent_items ? row.indent_items.length : 0
@@ -336,7 +336,7 @@ const Indent = () => {
       };
 
       lastMonthSale = getActive(row.lastMonthSale, row.qtyOut / row.bcs);
-      perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, row.qtyOut / daysDivisor);
+      perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, (row.qtyOut / daysDivisor) / row.bcs);
       finalAvgSale = getActive(row.finalAvgSale, (row.avgSale + perDaySaleLastMonth) / 2);
       thresholdSale = getActive(row.thresholdSale, finalAvgSale * 6);
       boxClosingQty = getActive(row.boxClosingQty, Math.max(0, row.closingQty) / row.bcs);
@@ -383,7 +383,7 @@ const Indent = () => {
       tableData.forEach((item) => {
         const calcs = calculateRow(item);
         const orderBoxVal = parseFloat(calcs.orderBox);
-        
+
         // Filter out orderBox values that are NaN, or <= 0.5 (including negative)
         if (!isNaN(orderBoxVal) && orderBoxVal > 0.5) {
           validItems.push({ item, calcs });
@@ -522,10 +522,10 @@ const Indent = () => {
         {/* Title and Description */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{ 
-              margin: 0, 
-              fontSize: '28px', 
-              fontWeight: '700', 
+            <h1 style={{
+              margin: 0,
+              fontSize: '28px',
+              fontWeight: '700',
               color: '#0f172a',
               letterSpacing: '-0.02em',
               lineHeight: '1.2'
@@ -533,10 +533,10 @@ const Indent = () => {
               Indent Calculations
             </h1>
             {!isLoading && (
-              <div style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                padding: '4px 10px', 
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 10px',
                 backgroundColor: '#eff6ff',
                 color: '#3b82f6',
                 borderRadius: '9999px',
@@ -550,9 +550,9 @@ const Indent = () => {
               </div>
             )}
           </div>
-          <p style={{ 
-            margin: 0, 
-            color: '#64748b', 
+          <p style={{
+            margin: 0,
+            color: '#64748b',
             fontSize: '15px',
             fontWeight: '400',
             letterSpacing: '0.01em'
@@ -576,128 +576,98 @@ const Indent = () => {
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             boxSizing: 'border-box'
           }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
-            <Settings2 size={16} />
-            <span>Threshold Days:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
+              <Settings2 size={16} />
+              <span>Threshold Days:</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {Object.entries(thresholdDays).map(([type, days]) => (
+                <div key={type} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: '#fff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  overflow: 'hidden'
+                }}>
+                  <span style={{
+                    backgroundColor: '#f1f5f9',
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#334155',
+                    borderRight: '1px solid #cbd5e1'
+                  }}>
+                    {type}
+                  </span>
+                  <input
+                    type="number"
+                    value={days}
+                    onChange={(e) => handleThresholdChange(type, e.target.value)}
+                    style={{
+                      width: '45px',
+                      padding: '4px',
+                      textAlign: 'center',
+                      border: 'none',
+                      outline: 'none',
+                      fontWeight: '600',
+                      color: '#0f172a',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {Object.entries(thresholdDays).map(([type, days]) => (
-              <div key={type} style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#fff',
+          {/* Divisor Selection UI */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: '#f8fafc',
+            padding: '0 16px',
+            height: '40px',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
+              <Settings2 size={16} />
+              <span>Divisor:</span>
+            </div>
+            <select
+              value={daysDivisor}
+              onChange={(e) => setDaysDivisor(Number(e.target.value))}
+              style={{
+                padding: '4px 8px',
                 border: '1px solid #cbd5e1',
                 borderRadius: '6px',
-                overflow: 'hidden'
-              }}>
-                <span style={{
-                  backgroundColor: '#f1f5f9',
-                  padding: '4px 8px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: '#334155',
-                  borderRight: '1px solid #cbd5e1'
-                }}>
-                  {type}
-                </span>
-                <input
-                  type="number"
-                  value={days}
-                  onChange={(e) => handleThresholdChange(type, e.target.value)}
-                  style={{
-                    width: '45px',
-                    padding: '4px',
-                    textAlign: 'center',
-                    border: 'none',
-                    outline: 'none',
-                    fontWeight: '600',
-                    color: '#0f172a',
-                    fontSize: '13px'
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Divisor Selection UI */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          backgroundColor: '#f8fafc',
-          padding: '0 16px',
-          height: '40px',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
-            <Settings2 size={16} />
-            <span>Divisor:</span>
-          </div>
-          <select 
-            value={daysDivisor} 
-            onChange={(e) => setDaysDivisor(Number(e.target.value))}
-            style={{
-              padding: '4px 8px',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              outline: 'none',
-              fontWeight: '600',
-              color: '#0f172a',
-              fontSize: '13px',
-              cursor: 'pointer',
-              backgroundColor: '#fff'
-            }}
-          >
-            <option value={7}>7 Days</option>
-            <option value={30}>30 Days</option>
-          </select>
-        </div>
-
-        {/* Action Buttons: Upload & Submit */}
-        <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-          <div>
-            <button
-              onClick={() => setShowModal(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: '#10b981',
-                color: '#ffffff',
-                padding: '0 16px',
-                height: '40px',
-                borderRadius: '8px',
+                outline: 'none',
+                fontWeight: '600',
+                color: '#0f172a',
+                fontSize: '13px',
                 cursor: 'pointer',
-                fontWeight: 'bold',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                border: 'none',
-                whiteSpace: 'nowrap',
-                boxSizing: 'border-box',
-                fontSize: '14px',
-                transition: 'all 0.2s ease',
-                flexShrink: 0
+                backgroundColor: '#fff'
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#059669'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; }}
             >
-              <Upload size={18} />
-              Upload CSV
-            </button>
+              <option value={7}>7 Days</option>
+              <option value={30}>30 Days</option>
+            </select>
           </div>
 
-          {tableData.length > 0 && !tableData[0]?.partyIndentId && (
+          {/* Action Buttons: Upload & Submit */}
+          <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
             <div>
-              <button 
+              <button
+                onClick={() => setShowModal(true)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  backgroundColor: '#4f46e5',
+                  backgroundColor: '#10b981',
                   color: '#ffffff',
                   padding: '0 16px',
                   height: '40px',
@@ -712,75 +682,105 @@ const Indent = () => {
                   transition: 'all 0.2s ease',
                   flexShrink: 0
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4338ca';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4f46e5';
-                }}
-                onClick={handleIndentSubmit}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#059669'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; }}
               >
-                <Send size={18} />
-                Submit Indent
+                <Upload size={18} />
+                Upload CSV
               </button>
             </div>
-          )}
 
-          {tableData.length > 0 && (
-            <div>
-              <button
-                onClick={() => {
-                  setTableData([]);
-                  sessionStorage.removeItem('indent_tableData');
-                  addToast("Data cleared successfully", "success");
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  padding: '0 16px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  border: 'none',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box',
-                  fontSize: '14px',
-                  flexShrink: 0,
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ef4444'; }}
-              >
-                <Trash2 size={18} />
-                Clear Data
-              </button>
-            </div>
-          )}
+            {tableData.length > 0 && !tableData[0]?.partyIndentId && (
+              <div>
+                <button
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#4f46e5',
+                    color: '#ffffff',
+                    padding: '0 16px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    border: 'none',
+                    whiteSpace: 'nowrap',
+                    boxSizing: 'border-box',
+                    fontSize: '14px',
+                    transition: 'all 0.2s ease',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#4f46e5';
+                  }}
+                  onClick={handleIndentSubmit}
+                >
+                  <Send size={18} />
+                  Submit Indent
+                </button>
+              </div>
+            )}
+
+            {tableData.length > 0 && (
+              <div>
+                <button
+                  onClick={() => {
+                    setTableData([]);
+                    sessionStorage.removeItem('indent_tableData');
+                    addToast("Data cleared successfully", "success");
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    padding: '0 16px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    border: 'none',
+                    whiteSpace: 'nowrap',
+                    boxSizing: 'border-box',
+                    fontSize: '14px',
+                    flexShrink: 0,
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ef4444'; }}
+                >
+                  <Trash2 size={18} />
+                  Clear Data
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
 
       {tableData.length > 0 ? (
         <>
-        <div style={{
-          overflowX: 'auto',
-          overflowY: 'auto',
-          maxHeight: '75vh',
-          border: '1px solid #ddd',
-          borderRadius: '4px',
-          backgroundColor: '#fff',
-          WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'smooth',
-          willChange: 'transform'
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', whiteSpace: 'normal', tableLayout: 'auto' }}>
-            <style>
-              {`
+          <div style={{
+            overflowX: 'auto',
+            overflowY: 'auto',
+            maxHeight: '75vh',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            backgroundColor: '#fff',
+            WebkitOverflowScrolling: 'touch',
+            scrollBehavior: 'smooth',
+            willChange: 'transform'
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', whiteSpace: 'normal', tableLayout: 'auto' }}>
+              <style>
+                {`
               .page-container div::-webkit-scrollbar {
                 height: 8px;
                 width: 8px;
@@ -797,193 +797,158 @@ const Indent = () => {
                 background: #94a3b8;
               }
             `}
-            </style>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-              <tr>
-                <th colSpan={tableData[0]?.partyIndentId ? "3" : "2"} style={{ ...tableHeaderStyle, backgroundColor: '#cbd5e1' }}>
-                  Item Master File
-                </th>
-                <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#e2e8f0' }}>
-                  Excel File (Editable)
-                </th>
-                <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#c7d2fe' }}>
-                  Calculations
-                </th>
-              </tr>
-              <tr style={{ color: '#475569', whiteSpace: 'nowrap', fontSize: '12px' }}>
-                {tableData[0]?.partyIndentId && (
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', backgroundColor: '#e2e8f0' }}>Indent ID</th>
-                )}
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'left', minWidth: '220px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Item Name</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Fix per day avg sale in box</th>
+              </style>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr>
+                  <th colSpan={tableData[0]?.partyIndentId ? "3" : "2"} style={{ ...tableHeaderStyle, backgroundColor: '#cbd5e1' }}>
+                    Item Master File
+                  </th>
+                  <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#e2e8f0' }}>
+                    Excel File (Editable)
+                  </th>
+                  <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#c7d2fe' }}>
+                    Calculations
+                  </th>
+                </tr>
+                <tr style={{ color: '#475569', whiteSpace: 'nowrap', fontSize: '12px' }}>
+                  {tableData[0]?.partyIndentId && (
+                    <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', backgroundColor: '#e2e8f0' }}>Indent ID</th>
+                  )}
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'left', minWidth: '220px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Item Name</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Fix per day avg sale in box</th>
 
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Quantity out</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Closing Qty</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Brand Name</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>B/Cs</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Mls</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Liquor Type</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Party Name</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Quantity out</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Closing Qty</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Brand Name</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>B/Cs</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Mls</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Liquor Type</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Party Name</th>
 
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Last Month sale in box</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Per day sale of last month</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Final Avg Sale</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Threshold sale</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Closing qty in Box</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Box</th>
-                <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableData.map((item, index) => {
-                const calcs = calculateRow(item);
-                const cellStyle = { border: '1px solid #e2e8f0', borderBottom: '1px solid #cbd5e1', color: '#475569' };
-                const rowBgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
-                const inputBgColor = 'transparent';
-                const inputFocusBgColor = 'rgba(99, 102, 241, 0.05)';
-                const calcCellBgColor = index % 2 === 0 ? '#f8faff' : '#f4f7ff'; // Very soft indigo tint for calcs
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Last Month sale in box</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Per day sale </th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Final Avg Sale</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Threshold sale</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Closing qty in Box</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Box</th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableData.map((item, index) => {
+                  const calcs = calculateRow(item);
+                  const cellStyle = { border: '1px solid #e2e8f0', borderBottom: '1px solid #cbd5e1', color: '#475569' };
+                  const rowBgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
+                  const inputBgColor = 'transparent';
+                  const inputFocusBgColor = 'rgba(99, 102, 241, 0.05)';
+                  const calcCellBgColor = index % 2 === 0 ? '#f8faff' : '#f4f7ff'; // Very soft indigo tint for calcs
 
-                return (
-                  <tr key={item.id} style={{ backgroundColor: rowBgColor, transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = rowBgColor}>
-                    {tableData[0]?.partyIndentId && (
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center', fontWeight: '600', color: '#0f172a', backgroundColor: '#f8fafc' }}>
-                        {item.partyIndentId}
+                  return (
+                    <tr key={item.id} className="indent-table-row" style={{ backgroundColor: rowBgColor }}>
+                      {tableData[0]?.partyIndentId && (
+                        <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center', fontWeight: '600', color: '#0f172a', backgroundColor: '#f8fafc' }}>
+                          {item.partyIndentId}
+                        </td>
+                      )}
+                      <td style={{ ...cellStyle, padding: '12px 10px', fontWeight: '500', color: '#1e293b' }}>{item.itemName}</td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500' }}>{item.avgSale}</td>
+
+                      {/* Inline Editable Inputs */}
+                      <td style={{ ...cellStyle, padding: 0 }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={item.qtyOut !== null ? item.qtyOut : ""}
+                          onChange={(e) => handleInlineChange(item.id, 'qtyOut', e.target.value)}
+                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
+                          placeholder="-"
+                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
+                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
+                        />
                       </td>
-                    )}
-                    <td style={{ ...cellStyle, padding: '12px 10px', fontWeight: '500', color: '#1e293b' }}>{item.itemName}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500' }}>{item.avgSale}</td>
+                      <td style={{ ...cellStyle, padding: 0 }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={item.closingQty !== null ? item.closingQty : ""}
+                          onChange={(e) => handleInlineChange(item.id, 'closingQty', e.target.value)}
+                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
+                          placeholder="-"
+                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
+                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
+                        />
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', color: '#1e293b', fontWeight: '500' }}>
+                        {item.brandName || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: 0 }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={item.bcs !== null ? item.bcs : ""}
+                          onChange={(e) => handleInlineChange(item.id, 'bcs', e.target.value)}
+                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
+                          placeholder="-"
+                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
+                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
+                        />
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
+                        {item.mls || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
+                        {item.liquorType || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px' }}>
+                        {item.partyName || "—"}
+                      </td>
 
-                    {/* Inline Editable Inputs */}
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={item.qtyOut !== null ? item.qtyOut : ""}
-                        onChange={(e) => handleInlineChange(item.id, 'qtyOut', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={item.closingQty !== null ? item.closingQty : ""}
-                        onChange={(e) => handleInlineChange(item.id, 'closingQty', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', color: '#1e293b', fontWeight: '500' }}>
-                      {item.brandName || "—"}
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={item.bcs !== null ? item.bcs : ""}
-                        onChange={(e) => handleInlineChange(item.id, 'bcs', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
-                      {item.mls || "—"}
-                    </td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
-                      {item.liquorType || "—"}
-                    </td>
-                    <td style={{ ...cellStyle, padding: '12px 10px' }}>
-                      {item.partyName || "—"}
-                    </td>
-
-                    {/* Calculation Display (Now Editable with Automatic Recalculation) */}
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.lastMonthSale}
-                        onChange={(e) => handleInlineChange(item.id, 'lastMonthSale', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.perDaySaleLastMonth}
-                        onChange={(e) => handleInlineChange(item.id, 'perDaySaleLastMonth', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.finalAvgSale}
-                        onChange={(e) => handleInlineChange(item.id, 'finalAvgSale', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.thresholdSale}
-                        onChange={(e) => handleInlineChange(item.id, 'thresholdSale', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.boxClosingQty}
-                        onChange={(e) => handleInlineChange(item.id, 'boxClosingQty', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.orderBox}
-                        onChange={(e) => handleInlineChange(item.id, 'orderBox', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                      <input
-                        type="number"
-                        step="any"
-                        value={calcs.orderQty}
-                        onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
-                        placeholder="-"
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      {/* Calculation Display */}
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
+                        {calcs.lastMonthSale || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
+                        {calcs.perDaySaleLastMonth || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
+                        {calcs.finalAvgSale || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
+                        {calcs.thresholdSale || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
+                        {calcs.boxClosingQty || "—"}
+                      </td>
+                      <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={calcs.orderBox}
+                          onChange={(e) => handleInlineChange(item.id, 'orderBox', e.target.value)}
+                          style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
+                          placeholder="-"
+                        />
+                      </td>
+                      <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                        <input
+                          type="number"
+                          step="any"
+                          value={calcs.orderQty}
+                          onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
+                          style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
+                          placeholder="-"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
         </>
       ) : (
-        <div 
+        <div
           onClick={() => {
             if (!isLoading) setShowModal(true);
           }}
@@ -1013,7 +978,7 @@ const Indent = () => {
             transition: 'all 0.2s ease',
             margin: '20px 0 40px 0',
             boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-        }}>
+          }}>
           {isLoading ? (
             <>
               <Loader2 className="search-icon" style={{ animation: 'spin 1s linear infinite', width: '32px', height: '32px', color: '#94a3b8', marginBottom: '16px' }} />
@@ -1037,7 +1002,7 @@ const Indent = () => {
           <List size={20} />
           Recent Indent Submissions
         </h2>
-        
+
         {isLoadingHistory ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
             <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#94a3b8' }} />
@@ -1047,7 +1012,7 @@ const Indent = () => {
             {submittedHistory.map((history) => {
               const isExpanded = expandedSubmissions[history.id];
               const items = submissionItems[history.id] || [];
-              
+
               return (
                 <div key={history.id} style={{
                   backgroundColor: '#ffffff',
@@ -1058,7 +1023,7 @@ const Indent = () => {
                   transition: 'all 0.3s ease'
                 }}>
                   {/* Header Row */}
-                  <div 
+                  <div
                     onClick={() => toggleSubmission(history.id)}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1091,13 +1056,13 @@ const Indent = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                      <span style={{ 
-                        display: 'inline-flex', alignItems: 'center', gap: '4px', 
-                        backgroundColor: history.status === 'Pending' ? '#fef3c7' : '#dcfce7', 
-                        color: history.status === 'Pending' ? '#d97706' : '#16a34a', 
-                        padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' 
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        backgroundColor: history.status === 'Pending' ? '#fef3c7' : '#dcfce7',
+                        color: history.status === 'Pending' ? '#d97706' : '#16a34a',
+                        padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600'
                       }}>
                         {history.status === 'Pending' ? <Clock size={12} /> : <CheckCircle size={12} />}
                         {history.status}
