@@ -72,13 +72,14 @@ const Indent = () => {
     try {
       const { data, error } = await supabase
         .from("masterItem")
-        .select("item_name, avg_sale");
+        .select("item_name, avg_sale, shop_id");
 
       if (error) throw error;
 
       const rawItems = (data || []).map((item) => ({
         itemName: (item.item_name || "").trim(),
         avgSale: parseFloat(item.avg_sale) || 0,
+        shopId: (item.shop_id || "").trim().toLowerCase(),
       }));
 
       setMasterItemsList(rawItems);
@@ -215,24 +216,29 @@ const Indent = () => {
 
     setTableData(() => {
       const matchedRecords = [];
+      const shopKey = (selectedShop || "").trim().toLowerCase();
+
       records.forEach((record, idx) => {
-        // Find match in master data to get avgSale
+        // Find match in master data to get avgSale, filtering by BOTH selected shop and item name
         const masterMatch = masterItemsList.find(
-          m => m.itemName.toLowerCase() === record.itemName.toLowerCase()
+          m => m.shopId === shopKey && m.itemName.toLowerCase() === record.itemName.toLowerCase()
         );
 
-        matchedRecords.push({
-          id: Date.now() + idx,
-          itemName: record.itemName,
-          avgSale: masterMatch ? masterMatch.avgSale : 0,
-          qtyOut: record.qtyOut,
-          closingQty: record.closingQty,
-          brandName: record.brandName,
-          bcs: record.bcs,
-          mls: record.mls,
-          liquorType: record.liquorType,
-          partyName: record.partyName || selectedShop,
-        });
+        // ONLY include/show if there is a match in the masterItem table for the selected shop!
+        if (masterMatch) {
+          matchedRecords.push({
+            id: Date.now() + idx,
+            itemName: masterMatch.itemName, // use item name from masterItem for exact match
+            avgSale: masterMatch.avgSale,
+            qtyOut: record.qtyOut,
+            closingQty: record.closingQty,
+            brandName: record.brandName,
+            bcs: record.bcs,
+            mls: record.mls,
+            liquorType: record.liquorType,
+            partyName: record.partyName || selectedShop,
+          });
+        }
       });
       return matchedRecords;
     });
