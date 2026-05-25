@@ -215,12 +215,7 @@ const VendorConfirmation = () => {
               <div className="vc-documents">
                 {poData.trader_pdf_url && (
                   <a href={poData.trader_pdf_url} target="_blank" rel="noopener noreferrer" className="vc-doc-link">
-                    <FileText size={18} /> View Trader PDF
-                  </a>
-                )}
-                {poData.receiver_pdf_url && (
-                  <a href={poData.receiver_pdf_url} target="_blank" rel="noopener noreferrer" className="vc-doc-link">
-                    <FileText size={18} /> View Receiver PDF
+                    <FileText size={18} /> View Trader Document
                   </a>
                 )}
               </div>

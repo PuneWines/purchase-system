@@ -457,20 +457,24 @@ const PurchaseOrder = () => {
       filename:     `${baseFilename}_Receiver.pdf`,
     };
     
-      // Generate Trader PDF Blob (upload only, no download)
+      // Generate Trader Image Blob (PNG screenshot of the PO document)
       const traderBlob = await new Promise((resolve) => {
-        html2pdf().set(optTrader).from(docTrader).toPdf().get('pdf').then((pdf) => {
-          resolve(pdf.output('blob'));
+        html2pdf().set(optTrader).from(docTrader).toContainer().toCanvas().get('canvas').then((canvas) => {
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/png');
         });
       });
 
       // Unhide receiver container temporarily
       receiverContainer.style.display = 'block';
       
-      // Generate Receiver PDF Blob (upload only, no download)
+      // Generate Receiver Image Blob (PNG screenshot of the PO document)
       const receiverBlob = await new Promise((resolve) => {
-        html2pdf().set(optReceiver).from(docReceiver).toPdf().get('pdf').then((pdf) => {
-          resolve(pdf.output('blob'));
+        html2pdf().set(optReceiver).from(docReceiver).toContainer().toCanvas().get('canvas').then((canvas) => {
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/png');
         });
       });
 
@@ -479,17 +483,17 @@ const PurchaseOrder = () => {
       
       // --- Upload to Supabase Storage ---
       const timestamp = Date.now();
-      const traderStoragePath = `${baseFilename}_Trader_${timestamp}.pdf`;
-      const receiverStoragePath = `${baseFilename}_Receiver_${timestamp}.pdf`;
+      const traderStoragePath = `${baseFilename}_Trader_${timestamp}.png`;
+      const receiverStoragePath = `${baseFilename}_Receiver_${timestamp}.png`;
 
       const { error: tErr } = await supabase.storage
         .from('PO')
-        .upload(traderStoragePath, traderBlob, { contentType: 'application/pdf', upsert: true });
+        .upload(traderStoragePath, traderBlob, { contentType: 'image/png', upsert: true });
       if (tErr) throw tErr;
 
       const { error: rErr } = await supabase.storage
         .from('PO')
-        .upload(receiverStoragePath, receiverBlob, { contentType: 'application/pdf', upsert: true });
+        .upload(receiverStoragePath, receiverBlob, { contentType: 'image/png', upsert: true });
       if (rErr) throw rErr;
 
       // Get Public URLs

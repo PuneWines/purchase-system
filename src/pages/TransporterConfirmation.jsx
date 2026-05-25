@@ -16,7 +16,6 @@ const TransporterConfirmation = () => {
   // Form State
   const [status, setStatus] = useState(""); // "yes" or "no"
   const [pickupDate, setPickupDate] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [remarks, setRemarks] = useState("");
   const [formError, setFormError] = useState("");
 
@@ -43,6 +42,11 @@ const TransporterConfirmation = () => {
         if (err) throw err;
         setPoData(data);
 
+        // Prefill pickupDate with trader's dispatch_date if available
+        if (data.dispatch_date) {
+          setPickupDate(data.dispatch_date);
+        }
+
         // If already submitted previously, show read-only submission screen
         if (data.transporter_status) {
           setSubmitted(true);
@@ -67,8 +71,8 @@ const TransporterConfirmation = () => {
       return;
     }
 
-    if (status === "yes" && (!pickupDate || !deliveryDate)) {
-      setFormError("Please specify both pick-up and expected delivery dates.");
+    if (status === "yes" && !pickupDate) {
+      setFormError("Please specify a pick-up date.");
       return;
     }
 
@@ -84,7 +88,6 @@ const TransporterConfirmation = () => {
         .update({
           transporter_status: status,
           pickup_date: pickupDate || null,
-          delivery_date: deliveryDate || null,
           transporter_remarks: remarks || null
         })
         .eq("id", id);
@@ -177,11 +180,6 @@ const TransporterConfirmation = () => {
                   <strong>Pick-Up Date:</strong> {new Date(poData.pickup_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                 </p>
               )}
-              {poData.delivery_date && (
-                <p style={{ margin: "0 0 10px 0", fontSize: "15px", color: "#78350f" }}>
-                  <strong>Expected Delivery Date:</strong> {new Date(poData.delivery_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                </p>
-              )}
               {poData.transporter_remarks && (
                 <p style={{ margin: 0, fontSize: "15px", color: "#78350f" }}>
                   <strong>Remarks:</strong> {poData.transporter_remarks}
@@ -221,13 +219,9 @@ const TransporterConfirmation = () => {
             <div className="vc-section">
               <h3>Documents</h3>
               <div className="vc-documents">
-                {poData.receiver_pdf_url ? (
-                  <a href={poData.receiver_pdf_url} target="_blank" rel="noopener noreferrer" className="vc-doc-link">
-                    <FileText size={18} /> View Receiver PDF
-                  </a>
-                ) : poData.trader_pdf_url && (
+                {poData.trader_pdf_url && (
                   <a href={poData.trader_pdf_url} target="_blank" rel="noopener noreferrer" className="vc-doc-link">
-                    <FileText size={18} /> View PO PDF
+                    <FileText size={18} /> View PO Document
                   </a>
                 )}
               </div>
@@ -265,30 +259,16 @@ const TransporterConfirmation = () => {
               </div>
 
               {status === "yes" && (
-                <>
-                  <div className="vc-form-group">
-                    <label className="vc-label-main" htmlFor="pickupDate">Pick-up Date *</label>
-                    <input
-                      type="date"
-                      id="pickupDate"
-                      className="vc-input"
-                      value={pickupDate}
-                      onChange={(e) => setPickupDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                  <div className="vc-form-group">
-                    <label className="vc-label-main" htmlFor="deliveryDate">Expected Delivery Date *</label>
-                    <input
-                      type="date"
-                      id="deliveryDate"
-                      className="vc-input"
-                      value={deliveryDate}
-                      onChange={(e) => setDeliveryDate(e.target.value)}
-                      min={pickupDate || new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                </>
+                <div className="vc-form-group">
+                  <label className="vc-label-main" htmlFor="pickupDate">Pick-up Date (Prefilled) *</label>
+                  <input
+                    type="date"
+                    id="pickupDate"
+                    className="vc-input"
+                    value={pickupDate}
+                    disabled
+                  />
+                </div>
               )}
 
               {(status === "yes" || status === "no") && (

@@ -57,31 +57,43 @@ const ReceiverConfirmation = () => {
           const { data: itemsData, error: itemsErr } = await supabase
             .from("indent_items")
             .select("*")
-            .eq("indent_id", po.indent_id)
-            .eq("party_name", po.vendor_name);
+            .eq("unique_indent_id", po.indent_id)
+            .eq("approval_status", "approved"); // fetch approved items for this indent
 
           if (!itemsErr && itemsData) {
             const filtered = itemsData
-              .filter(item => parseFloat(item.order_qty) > 0)
-              .map(item => ({
-                id: item.id,
-                itemName: item.item_name,
-                brandName: item.brand_name,
-                orderQty: parseFloat(item.order_qty),
-                bcs: item.bcs ? parseFloat(item.bcs) : null
-              }));
+              .filter(item => 
+                item.party_name?.toLowerCase() === po.vendor_name?.toLowerCase() &&
+                parseFloat(item.order_qty) > 0
+              )
+              .map(item => {
+                const orderQty = parseFloat(item.order_qty) || 0;
+                const bcs = item.bcs ? parseFloat(item.bcs) : null;
+                const orderBox = (orderQty && bcs) ? orderQty / bcs : null;
+                return {
+                  id: item.id,
+                  itemName: item.item_name,
+                  brandName: item.brand_name,
+                  orderQty: orderQty,
+                  bcs: bcs,
+                  orderBox: orderBox,
+                  closingQty: item.closing_qty != null ? item.closing_qty : "—"
+                };
+              });
             setOrderItems(filtered);
 
-            // Initialize receivedQtys with orderQty if not already submitted
+            // Initialize receivedQtys with 0 if not already submitted
             if (!po.receiver_status) {
               const initQtys = {};
               filtered.forEach(item => {
-                initQtys[item.id] = item.orderQty; // Default to full receive
+                initQtys[item.id] = 0; // Default to 0
               });
               setReceivedQtys(initQtys);
             }
           }
         }
+
+
       } catch (err) {
         console.error("Error fetching data:", err);
         setError("Purchase Order not found or an error occurred.");
@@ -234,9 +246,9 @@ const ReceiverConfirmation = () => {
                 <div className="vc-detail-item">
                   <span className="vc-label">PO Document</span>
                   <span className="vc-value">
-                    {poData.receiver_pdf_url || poData.trader_pdf_url ? (
-                      <a href={poData.receiver_pdf_url || poData.trader_pdf_url} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FileText size={16} /> View PDF
+                    {poData.receiver_pdf_url ? (
+                      <a href={poData.receiver_pdf_url} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <FileText size={16} /> View Document
                       </a>
                     ) : "N/A"}
                   </span>
@@ -251,23 +263,31 @@ const ReceiverConfirmation = () => {
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>S.No</th>
                         <th style={{ padding: '10px' }}>Item Name</th>
                         <th style={{ padding: '10px' }}>Brand</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Ordered Qty</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Closing Stock in Bottle</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Order in Box</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Qty Type</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Received Qty</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>Difference</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orderItems.map((item) => {
+                      {orderItems.map((item, i) => {
                         const recVal = receivedQtys[item.id];
                         const rQty = Number(recVal) || 0;
                         const diff = rQty - item.orderQty;
                         return (
                           <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{i + 1}</td>
                             <td style={{ padding: '10px', fontWeight: '500' }}>{item.itemName}</td>
-                            <td style={{ padding: '10px', color: '#64748b' }}>{item.brandName || "—"}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.orderQty}</td>
+                            <td style={{ padding: '10px', color: '#64748b' }}>{item.brandName || item.itemName}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.closingQty}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              {item.orderBox != null ? item.orderBox.toFixed(2) : "—"}
+                            </td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Bottle / Box</td>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
                               <input 
                                 type="number"

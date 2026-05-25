@@ -145,6 +145,52 @@ export const sendWhatsAppMessage = async (toNumber, message) => {
 };
 
 /**
+ * Send a WhatsApp media message (like a PDF document or image) via Maytapi.
+ *
+ * @param {string} toNumber - Recipient phone number (with country code, no +)
+ * @param {string} mediaUrl  - Public URL of the media file (PDF, PNG, etc.)
+ * @param {string} caption  - Caption text for the media message
+ * @returns {Promise<boolean>} true on success, false on failure
+ */
+export const sendWhatsAppMediaMessage = async (toNumber, mediaUrl, caption) => {
+  if (!MAYTAPI_PRODUCT_ID || !MAYTAPI_PHONE_ID || !MAYTAPI_TOKEN) {
+    console.warn("[WhatsApp] Maytapi credentials are not configured in .env");
+    return false;
+  }
+
+  const url = `https://api.maytapi.com/api/${MAYTAPI_PRODUCT_ID}/${MAYTAPI_PHONE_ID}/sendMessage`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-maytapi-key": MAYTAPI_TOKEN,
+      },
+      body: JSON.stringify({
+        to_number: toNumber,
+        type: "media",
+        message: mediaUrl,
+        text: caption,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      console.error("[WhatsApp] Failed to send media message:", data);
+      return false;
+    }
+
+    console.log(`[WhatsApp] Media message sent successfully to ${toNumber}:`, data);
+    return true;
+  } catch (error) {
+    console.error("[WhatsApp] Error sending media message:", error);
+    return false;
+  }
+};
+
+/**
  * Send the same WhatsApp message to multiple numbers in parallel.
  * Returns an array of result objects { number, success }.
  */
@@ -505,7 +551,9 @@ ${secureLink}
 THANKS & REGARDS
 TEAM ${companyName || 'DRINQKART'}`;
 
-    const success = await sendWhatsAppMessage(phoneNumber, message);
+    const success = pdfUrl
+      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
+      : await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] PO confirmation sent to", phoneNumber);
@@ -552,7 +600,9 @@ ${secureLink}
 THANKS & REGARDS
 TEAM ${companyName || 'DRINQKART'}`;
 
-    const success = await sendWhatsAppMessage(phoneNumber, message);
+    const success = pdfUrl
+      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
+      : await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Transporter confirmation sent to", phoneNumber);
@@ -598,7 +648,9 @@ ${secureLink}
 THANKS & REGARDS
 TEAM ${companyName || 'DRINQKART'}`;
 
-    const success = await sendWhatsAppMessage(phoneNumber, message);
+    const success = pdfUrl
+      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
+      : await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Receiver confirmation sent to", phoneNumber);
