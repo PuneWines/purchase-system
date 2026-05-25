@@ -112,6 +112,24 @@ const ReceiverConfirmation = () => {
     }));
   };
 
+  const handleMatchAll = () => {
+    if (status === "no") return;
+    const matched = {};
+    orderItems.forEach(item => {
+      matched[item.id] = item.orderQty;
+    });
+    setReceivedQtys(matched);
+  };
+
+  const handleResetAll = () => {
+    if (status === "no") return;
+    const reset = {};
+    orderItems.forEach(item => {
+      reset[item.id] = 0;
+    });
+    setReceivedQtys(reset);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
@@ -257,56 +275,243 @@ const ReceiverConfirmation = () => {
             </div>
 
             <div className="vc-section">
-              <h3>Item Verification</h3>
+              <div className="vc-section-header-flex">
+                <h3>Item Verification</h3>
+                {orderItems.length > 0 && (
+                  <div className="vc-quick-actions">
+                    <button
+                      type="button"
+                      className="vc-action-btn vc-btn-match"
+                      onClick={handleMatchAll}
+                      disabled={status === "no"}
+                    >
+                      ✨ Match All Order Quantities
+                    </button>
+                    <button
+                      type="button"
+                      className="vc-action-btn vc-btn-reset"
+                      onClick={handleResetAll}
+                      disabled={status === "no"}
+                    >
+                      🔄 Reset All to 0
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {orderItems.length > 0 ? (
-                <div style={{ overflowX: 'auto', marginTop: '16px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>S.No</th>
-                        <th style={{ padding: '10px' }}>Item Name</th>
-                        <th style={{ padding: '10px' }}>Brand</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Closing Stock in Bottle</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Order in Box</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Qty Type</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Received Qty</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Difference</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orderItems.map((item, i) => {
-                        const recVal = receivedQtys[item.id];
-                        const rQty = Number(recVal) || 0;
-                        const diff = rQty - item.orderQty;
-                        return (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{i + 1}</td>
-                            <td style={{ padding: '10px', fontWeight: '500' }}>{item.itemName}</td>
-                            <td style={{ padding: '10px', color: '#64748b' }}>{item.brandName || item.itemName}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.closingQty}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
-                              {item.orderBox != null ? item.orderBox.toFixed(2) : "—"}
-                            </td>
-                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Bottle / Box</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
-                              <input 
-                                type="number"
-                                min="0"
-                                style={{ width: '80px', padding: '6px', textAlign: 'center', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                                value={receivedQtys[item.id] === undefined ? "" : receivedQtys[item.id]}
-                                onChange={(e) => handleQtyChange(item.id, e.target.value)}
-                                disabled={status === "no"}
-                              />
-                            </td>
-                            <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: diff < 0 ? '#ef4444' : (diff > 0 ? '#f59e0b' : '#10b981') }}>
-                              {diff > 0 ? `+${diff}` : diff}
-                            </td>
+                <>
+                  {/* Desktop Table View */}
+                  <div className="vc-table-desktop">
+                    <div className="vc-table-wrapper">
+                      <table className="vc-desktop-table">
+                        <thead>
+                          <tr>
+                            <th className="vc-th-center" style={{ width: '60px' }}>S.No</th>
+                            <th>Item Name</th>
+                            <th>Brand</th>
+                            <th className="vc-th-center" style={{ width: '120px' }}>Closing Stock</th>
+                            <th className="vc-th-center" style={{ width: '120px' }}>Ordered Box</th>
+                            <th className="vc-th-center" style={{ width: '120px' }}>Ordered Qty</th>
+                            <th className="vc-th-center" style={{ width: '260px' }}>Received Qty</th>
+                            <th className="vc-th-center" style={{ width: '150px' }}>Difference</th>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody>
+                          {orderItems.map((item, i) => {
+                            const recVal = receivedQtys[item.id];
+                            const rQty = Number(recVal) || 0;
+                            const diff = rQty - item.orderQty;
+
+                            let diffBadgeClass = "vc-badge-match";
+                            let diffText = "Perfect Match";
+                            if (diff < 0) {
+                              diffBadgeClass = "vc-badge-shortage";
+                              diffText = `${diff} Bottles`;
+                            } else if (diff > 0) {
+                              diffBadgeClass = "vc-badge-surplus";
+                              diffText = `+${diff} Bottles`;
+                            }
+
+                            return (
+                              <tr key={item.id} className={diff === 0 ? "vc-tr-match" : (diff < 0 ? "vc-tr-shortage" : "vc-tr-surplus")}>
+                                <td className="vc-td-center vc-text-muted">{i + 1}</td>
+                                <td className="vc-font-semibold">{item.itemName}</td>
+                                <td className="vc-text-muted">{item.brandName || item.itemName}</td>
+                                <td className="vc-td-center">{item.closingQty} Bottles</td>
+                                <td className="vc-td-center vc-font-medium">
+                                  {item.orderBox != null ? item.orderBox.toFixed(2) : "—"}
+                                </td>
+                                <td className="vc-td-center vc-font-medium">{item.orderQty} Bottles</td>
+                                <td className="vc-td-center">
+                                  <div className="vc-table-qty-control">
+                                    <button
+                                      type="button"
+                                      className="vc-table-qty-btn"
+                                      onClick={() => {
+                                        const newVal = Math.max(0, rQty - 1);
+                                        handleQtyChange(item.id, newVal);
+                                      }}
+                                      disabled={status === "no" || rQty <= 0}
+                                    >
+                                      −
+                                    </button>
+                                    <input 
+                                      type="number"
+                                      min="0"
+                                      className="vc-table-qty-input"
+                                      value={receivedQtys[item.id] === undefined ? "" : receivedQtys[item.id]}
+                                      onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                                      disabled={status === "no"}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="vc-table-qty-btn"
+                                      onClick={() => {
+                                        const newVal = rQty + 1;
+                                        handleQtyChange(item.id, newVal);
+                                      }}
+                                      disabled={status === "no"}
+                                    >
+                                      +
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="vc-table-match-btn"
+                                      onClick={() => handleQtyChange(item.id, item.orderQty)}
+                                      disabled={status === "no" || rQty === item.orderQty}
+                                      title="Match ordered quantity"
+                                    >
+                                      Match
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="vc-td-center">
+                                  <span className={`vc-diff-badge ${diffBadgeClass}`}>
+                                    {diffText}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="vc-cards-mobile">
+                    {orderItems.map((item, i) => {
+                      const recVal = receivedQtys[item.id];
+                      const rQty = Number(recVal) || 0;
+                      const diff = rQty - item.orderQty;
+
+                      const handleDecrement = () => {
+                        if (status === "no") return;
+                        const newVal = Math.max(0, rQty - 1);
+                        handleQtyChange(item.id, newVal);
+                      };
+
+                      const handleIncrement = () => {
+                        if (status === "no") return;
+                        const newVal = rQty + 1;
+                        handleQtyChange(item.id, newVal);
+                      };
+
+                      let cardStatusClass = "vc-card-match";
+                      let diffText = "Perfect Match";
+                      let diffBadgeClass = "vc-badge-match";
+                      
+                      if (diff < 0) {
+                        cardStatusClass = "vc-card-shortage";
+                        diffText = `${diff} Bottles`;
+                        diffBadgeClass = "vc-badge-shortage";
+                      } else if (diff > 0) {
+                        cardStatusClass = "vc-card-surplus";
+                        diffText = `+${diff} Bottles`;
+                        diffBadgeClass = "vc-badge-surplus";
+                      }
+
+                      return (
+                        <div className={`vc-item-card ${cardStatusClass}`} key={item.id}>
+                          <div className="vc-item-card-header">
+                            <div className="vc-item-card-header-left">
+                              <span className="vc-item-card-index">#{i + 1}</span>
+                              <span className="vc-item-card-title">{item.itemName}</span>
+                            </div>
+                            <span className={`vc-diff-badge ${diffBadgeClass} vc-card-badge-header`}>
+                              {diffText}
+                            </span>
+                          </div>
+                          
+                          <div className="vc-item-card-details">
+                            <div className="vc-card-detail-row">
+                              <div className="vc-detail-pair">
+                                <span className="vc-item-card-detail-label">Brand</span>
+                                <span className="vc-item-card-detail-value">{item.brandName || item.itemName}</span>
+                              </div>
+                              <div className="vc-detail-pair">
+                                <span className="vc-item-card-detail-label">Closing Stock</span>
+                                <span className="vc-item-card-detail-value">{item.closingQty} Bottles</span>
+                              </div>
+                            </div>
+                            <div className="vc-card-detail-row vc-detail-row-divider">
+                              <div className="vc-detail-pair">
+                                <span className="vc-item-card-detail-label">Ordered Boxes</span>
+                                <span className="vc-item-card-detail-value">{item.orderBox != null ? item.orderBox.toFixed(2) : "—"} Boxes</span>
+                              </div>
+                              <div className="vc-detail-pair">
+                                <span className="vc-item-card-detail-label">Ordered Qty</span>
+                                <span className="vc-item-card-detail-value">{item.orderQty} Bottles</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="vc-item-card-actions">
+                            <div className="vc-counter-container">
+                              <span className="vc-item-qty-label">Received Qty</span>
+                              <div className="vc-qty-counter">
+                                <button 
+                                  type="button" 
+                                  className="vc-qty-btn vc-btn-minus"
+                                  onClick={handleDecrement}
+                                  disabled={status === "no" || rQty <= 0}
+                                >
+                                  −
+                                </button>
+                                <input 
+                                  type="number" 
+                                  className="vc-qty-input"
+                                  min="0"
+                                  value={receivedQtys[item.id] === undefined ? "" : receivedQtys[item.id]}
+                                  onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                                  disabled={status === "no"}
+                                />
+                                <button 
+                                  type="button" 
+                                  className="vc-qty-btn vc-btn-plus"
+                                  onClick={handleIncrement}
+                                  disabled={status === "no"}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              className="vc-card-match-btn"
+                              onClick={() => handleQtyChange(item.id, item.orderQty)}
+                              disabled={status === "no" || rQty === item.orderQty}
+                            >
+                              🎯 Match Order ({item.orderQty})
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               ) : (
                 <p style={{ color: '#64748b', fontSize: '0.875rem' }}>No item data found for this order.</p>
               )}
