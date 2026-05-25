@@ -326,28 +326,32 @@ const Indent = () => {
     let orderQty = 0;
 
     if (hasData) {
-      lastMonthSale = row.qtyOut / row.bcs;
-      perDaySaleLastMonth = row.qtyOut / daysDivisor;
-      finalAvgSale = (row.avgSale + perDaySaleLastMonth) / 2;
+      // Helper to parse overrides safely and cascade them downstream
+      const getActive = (val, calculated) => {
+        if (val !== undefined && val !== null && val !== "") {
+          const num = parseFloat(val);
+          return isNaN(num) ? calculated : num;
+        }
+        return calculated;
+      };
 
-      thresholdSale = finalAvgSale * 6;
-
-      // Used Closing Qty instead of Quantity Out for closing qty (likely user copy-paste error)
-      // Negative closing qty should be considered as 0
-      boxClosingQty = Math.max(0, row.closingQty) / row.bcs;
-      orderBox = thresholdSale - boxClosingQty;
-      // Used orderBox instead of 0.2 (likely typo)
-      orderQty = orderBox * row.bcs;
+      lastMonthSale = getActive(row.lastMonthSale, row.qtyOut / row.bcs);
+      perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, row.qtyOut / daysDivisor);
+      finalAvgSale = getActive(row.finalAvgSale, (row.avgSale + perDaySaleLastMonth) / 2);
+      thresholdSale = getActive(row.thresholdSale, finalAvgSale * 6);
+      boxClosingQty = getActive(row.boxClosingQty, Math.max(0, row.closingQty) / row.bcs);
+      orderBox = getActive(row.orderBox, thresholdSale - boxClosingQty);
+      orderQty = getActive(row.orderQty, orderBox * row.bcs);
     }
 
     return {
-      lastMonthSale: hasData ? lastMonthSale.toFixed(2) : "",
-      perDaySaleLastMonth: hasData ? perDaySaleLastMonth.toFixed(2) : "",
-      finalAvgSale: hasData ? finalAvgSale.toFixed(2) : "",
-      thresholdSale: hasData ? thresholdSale.toFixed(2) : "",
-      boxClosingQty: hasData ? boxClosingQty.toFixed(2) : "",
-      orderBox: hasData ? orderBox.toFixed(2) : "",
-      orderQty: hasData ? orderQty.toFixed(2) : ""
+      lastMonthSale: hasData ? (row.lastMonthSale !== undefined && row.lastMonthSale !== null && row.lastMonthSale !== "" ? row.lastMonthSale : lastMonthSale.toFixed(2)) : "",
+      perDaySaleLastMonth: hasData ? (row.perDaySaleLastMonth !== undefined && row.perDaySaleLastMonth !== null && row.perDaySaleLastMonth !== "" ? row.perDaySaleLastMonth : perDaySaleLastMonth.toFixed(2)) : "",
+      finalAvgSale: hasData ? (row.finalAvgSale !== undefined && row.finalAvgSale !== null && row.finalAvgSale !== "" ? row.finalAvgSale : finalAvgSale.toFixed(2)) : "",
+      thresholdSale: hasData ? (row.thresholdSale !== undefined && row.thresholdSale !== null && row.thresholdSale !== "" ? row.thresholdSale : thresholdSale.toFixed(2)) : "",
+      boxClosingQty: hasData ? (row.boxClosingQty !== undefined && row.boxClosingQty !== null && row.boxClosingQty !== "" ? row.boxClosingQty : boxClosingQty.toFixed(2)) : "",
+      orderBox: hasData ? (row.orderBox !== undefined && row.orderBox !== null && row.orderBox !== "" ? row.orderBox : orderBox.toFixed(2)) : "",
+      orderQty: hasData ? (row.orderQty !== undefined && row.orderQty !== null && row.orderQty !== "" ? row.orderQty : orderQty.toFixed(2)) : ""
     };
   };
 
@@ -874,16 +878,8 @@ const Indent = () => {
                         onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
                       />
                     </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="text"
-                        value={item.brandName}
-                        onChange={(e) => handleInlineChange(item.id, 'brandName', e.target.value)}
-                        style={{ ...inlineInputStyle, backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
+                    <td style={{ ...cellStyle, padding: '12px 10px', color: '#1e293b', fontWeight: '500' }}>
+                      {item.brandName || "—"}
                     </td>
                     <td style={{ ...cellStyle, padding: 0 }}>
                       <input
@@ -897,48 +893,87 @@ const Indent = () => {
                         onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
                       />
                     </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="text"
-                        value={item.mls}
-                        onChange={(e) => handleInlineChange(item.id, 'mls', e.target.value)}
-                        style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
+                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
+                      {item.mls || "—"}
                     </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="text"
-                        value={item.liquorType}
-                        onChange={(e) => handleInlineChange(item.id, 'liquorType', e.target.value)}
-                        style={{ ...inlineInputStyle, backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
+                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
+                      {item.liquorType || "—"}
                     </td>
-                    <td style={{ ...cellStyle, padding: 0 }}>
-                      <input
-                        type="text"
-                        value={item.partyName}
-                        onChange={(e) => handleInlineChange(item.id, 'partyName', e.target.value)}
-                        style={{ ...inlineInputStyle, backgroundColor: inputBgColor }}
-                        placeholder="-"
-                        onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                        onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                      />
+                    <td style={{ ...cellStyle, padding: '12px 10px' }}>
+                      {item.partyName || "—"}
                     </td>
 
-                    {/* Calculation Display */}
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '500' }}>{calcs.lastMonthSale}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '500' }}>{calcs.perDaySaleLastMonth}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '500' }}>{calcs.finalAvgSale}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '500' }}>{calcs.thresholdSale}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '500' }}>{calcs.boxClosingQty}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '600', color: '#4338ca' }}>{calcs.orderBox}</td>
-                    <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', backgroundColor: calcCellBgColor, fontWeight: '600', color: '#4338ca' }}>{calcs.orderQty}</td>
+                    {/* Calculation Display (Now Editable with Automatic Recalculation) */}
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.lastMonthSale}
+                        onChange={(e) => handleInlineChange(item.id, 'lastMonthSale', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.perDaySaleLastMonth}
+                        onChange={(e) => handleInlineChange(item.id, 'perDaySaleLastMonth', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.finalAvgSale}
+                        onChange={(e) => handleInlineChange(item.id, 'finalAvgSale', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.thresholdSale}
+                        onChange={(e) => handleInlineChange(item.id, 'thresholdSale', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.boxClosingQty}
+                        onChange={(e) => handleInlineChange(item.id, 'boxClosingQty', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '500', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.orderBox}
+                        onChange={(e) => handleInlineChange(item.id, 'orderBox', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
+                      <input
+                        type="number"
+                        step="any"
+                        value={calcs.orderQty}
+                        onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
+                        style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
+                        placeholder="-"
+                      />
+                    </td>
                   </tr>
                 );
               })}

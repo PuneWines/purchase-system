@@ -654,11 +654,7 @@ const PurchaseOrder = () => {
         const approvedParties = [...new Set(indentData.map(d => d.party_name).filter(Boolean))];
         setDbParties(approvedParties);
         
-        if (approvedParties.length > 0) {
-           setActiveParty(approvedParties[0]);
-        } else {
-           setActiveParty("");
-        }
+        setActiveParty("");
       }
       setIsLoading(false);
     };
@@ -705,6 +701,24 @@ const PurchaseOrder = () => {
           <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
           <h2>No Vendors Found</h2>
           <p>Please add vendors in the Settings section first.</p>
+        </div>
+      )}
+
+      {!isLoading && dbParties.length > 0 && !activeParty && (
+        <div className="po-empty" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '48px 24px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <ShoppingCart size={48} style={{ marginBottom: 16, color: '#4f46e5' }} />
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>Select a Vendor</h2>
+          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', maxWidth: '360px', textAlign: 'center', margin: '0 auto 24px auto' }}>
+            Please select a vendor from the dropdown to generate, view, and submit their Purchase Order.
+          </p>
+          <div style={{ display: 'inline-block', width: '100%', maxWidth: '300px', textAlign: 'left' }}>
+            <SearchableDropdown 
+              options={dbParties} 
+              value={activeParty} 
+              onChange={setActiveParty} 
+              placeholder="Select a vendor..."
+            />
+          </div>
         </div>
       )}
 
