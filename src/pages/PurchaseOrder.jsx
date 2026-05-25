@@ -6,6 +6,28 @@ import useCompanyStore from "../store/useCompanyStore";
 import "../styles/PurchaseOrder.css";
 import html2pdf from "html2pdf.js";
 
+/* ── Helper: Process Quantity Logic ───────────────────────── */
+const processQuantity = (qtyInBox) => {
+  if (qtyInBox === null || qtyInBox === undefined || isNaN(qtyInBox)) {
+    return { qtyType: "—", displayQty: "—", processedQty: 0 };
+  }
+  const decimalPart = parseFloat((qtyInBox % 1).toFixed(4));
+  if (decimalPart >= 0.90) {
+    const rounded = Math.ceil(qtyInBox);
+    return {
+      qtyType: "Box",
+      displayQty: rounded.toString(),
+      processedQty: rounded
+    };
+  } else {
+    return {
+      qtyType: "Bottles",
+      displayQty: qtyInBox.toFixed(2),
+      processedQty: qtyInBox
+    };
+  }
+};
+
 /* ── Constants ─────────────────────────────────────────────── */
 const COMPANY = {
   name: "DRINQKART",
@@ -134,13 +156,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
 
 /* ── Sub-component: single PO document ─────────────────────── */
 const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDate, dbParties = [], onPartyChange, vendorDetails, companyInfo, companyTerms, transporters = [], receivers = [], selectedTransporter, setSelectedTransporter, selectedReceiver, setSelectedReceiver, shippingError }) => {
-  const orderQtyRows = items.map((item, i) => {
-    const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : null;
-    const bcs      = item.bcs      !== null       ? parseFloat(item.bcs)      : null;
-    const orderBox = orderQty !== null && bcs ? orderQty / bcs : null;
-
-    return { ...item, orderQty, bcs, orderBox };
-  });
+  const orderQtyRows = items;
 
   const totalBoxes = orderQtyRows.reduce((s, r) => s + (r.orderBox || 0), 0);
   const totalBottles = orderQtyRows.reduce((s, r) => s + (r.orderQty || 0), 0);
@@ -222,7 +238,6 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
           <tr>
             <th className="po-text-center">S.No</th>
             <th>Item Name</th>
-            <th>Brand</th>
             {isReceiver ? (
               <>
                 <th className="po-text-center">Closing Stock in Bottle</th>
@@ -232,60 +247,69 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
             ) : (
               <>
                 <th className="po-text-center">Qty Type</th>
-                <th className="po-text-center">Order Qty (Bottles)</th>
-                <th className="po-text-center">Order Boxes</th>
+                <th className="po-text-center">Order Quantity</th>
               </>
             )}
           </tr>
         </thead>
         <tbody>
-          {orderQtyRows.map((item, i) => (
-            <tr key={item.id || i}>
-              <td className="po-text-center">{i + 1}</td>
-              <td><strong>{item.itemName || "—"}</strong></td>
-              <td>{item.brandName || item.itemName || "—"}</td>
-              
-              {isReceiver ? (
-                <>
-                  <td className="po-text-center">
-                    {item.closingQty != null ? item.closingQty : "—"}
-                  </td>
-                  <td className="po-text-center">
-                    {item.orderBox != null ? item.orderBox.toFixed(2) : "—"}
-                  </td>
-                  <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>Bottle / Box</td>
-                </>
-              ) : (
-                <>
-                  <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>Bottle / Box</td>
-                  <td className="po-text-center">
-                    {item.orderQty != null ? Math.ceil(item.orderQty).toLocaleString("en-IN") : "—"}
-                  </td>
-                  <td className="po-text-center">
-                    {item.orderBox != null ? item.orderBox.toFixed(2) : "—"}
-                  </td>
-                </>
-              )}
+          {partyName ? (
+            orderQtyRows.map((item, i) => (
+              <tr key={item.id || i}>
+                <td className="po-text-center">{i + 1}</td>
+                <td><strong>{item.itemName || "—"}</strong></td>
+                
+                {isReceiver ? (
+                  <>
+                    <td className="po-text-center">
+                      {item.closingQty != null ? item.closingQty : "—"}
+                    </td>
+                    <td className="po-text-center">
+                      {item.displayQty || "—"}
+                    </td>
+                    <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                      {item.qtyType || "—"}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                      {item.qtyType || "—"}
+                    </td>
+                    <td className="po-text-center">
+                      {item.displayQty || "—"}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={isReceiver ? 5 : 4} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
+                Please select a vendor above to view the items list.
+              </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
 
       {/* ── Totals ──────────────────────────────────────────── */}
-      <div className="po-totals-container">
-        <table className="po-totals-table">
-          <tbody>
-            <tr>
-              <td>Total Bottles</td>
-              <td>{Math.ceil(totalBottles).toLocaleString("en-IN")}</td>
-            </tr>
-            <tr>
-              <td>Total Boxes</td>
-              <td>{totalBoxes.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      {partyName && (
+        <div className="po-totals-container">
+          <table className="po-totals-table">
+            <tbody>
+              <tr>
+                <td>Total Bottles</td>
+                <td>{Math.ceil(totalBottles).toLocaleString("en-IN")}</td>
+              </tr>
+              <tr>
+                <td>Total Boxes</td>
+                <td>{totalBoxes.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ── Footer: Terms + Signature ───────────────────────── */}
       <div className="po-footer-section">
@@ -307,45 +331,47 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
       </div>
 
       {/* ── Shipping Details (Transporter & Receiver) ───────── */}
-      <div className="po-shipping-details" id={`shipping-details-${id}`}>
-        {shippingError && <div className="shipping-error-msg">{shippingError}</div>}
-        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
-          <div className="shipping-field">
-            <strong>Transporter: <span style={{color: 'red'}}>*</span></strong>
-            <select 
-              className="shipping-select" 
-              value={selectedTransporter} 
-              onChange={(e) => {
-                setSelectedTransporter?.(e.target.value);
-                const el = document.getElementById(`shipping-details-${id}`);
-                if (el) el.classList.remove('highlight-error');
-              }}
-            >
-            <option value="">Select Transporter</option>
-            {transporters.map((t) => (
-              <option key={t.id} value={t.contact_number}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-          <div className="shipping-field">
-            <strong>Receiver: <span style={{color: 'red'}}>*</span></strong>
-            <select 
-              className="shipping-select" 
-              value={selectedReceiver} 
-              onChange={(e) => {
-                setSelectedReceiver?.(e.target.value);
-                const el = document.getElementById(`shipping-details-${id}`);
-                if (el) el.classList.remove('highlight-error');
-              }}
-            >
-            <option value="">Select Receiver</option>
-            {receivers.map((r) => (
-              <option key={r.id} value={r.contact_number}>{r.name}</option>
-            ))}
-            </select>
+      {partyName && (
+        <div className="po-shipping-details" id={`shipping-details-${id}`}>
+          {shippingError && <div className="shipping-error-msg">{shippingError}</div>}
+          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
+            <div className="shipping-field">
+              <strong>Transporter: <span style={{color: 'red'}}>*</span></strong>
+              <select 
+                className="shipping-select" 
+                value={selectedTransporter} 
+                onChange={(e) => {
+                  setSelectedTransporter?.(e.target.value);
+                  const el = document.getElementById(`shipping-details-${id}`);
+                  if (el) el.classList.remove('highlight-error');
+                }}
+              >
+                <option value="">Select Transporter</option>
+                {transporters.map((t) => (
+                  <option key={t.id} value={t.contact_number}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="shipping-field">
+              <strong>Receiver: <span style={{color: 'red'}}>*</span></strong>
+              <select 
+                className="shipping-select" 
+                value={selectedReceiver} 
+                onChange={(e) => {
+                  setSelectedReceiver?.(e.target.value);
+                  const el = document.getElementById(`shipping-details-${id}`);
+                  if (el) el.classList.remove('highlight-error');
+                }}
+              >
+                <option value="">Select Receiver</option>
+                {receivers.map((r) => (
+                  <option key={r.id} value={r.contact_number}>{r.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
@@ -397,13 +423,27 @@ const PurchaseOrder = () => {
       .filter(item => item.party_name === activeParty)
       .map(row => {
         const oq = parseFloat(row.order_qty ?? 0);
+        const bcs = row.bcs !== null ? parseFloat(row.bcs) : null;
+        
+        const rawOrderQty = isNaN(oq) ? 0 : oq;
+        const rawOrderBox = rawOrderQty && bcs ? rawOrderQty / bcs : null;
+        
+        const { qtyType, displayQty, processedQty } = processQuantity(rawOrderBox);
+        
+        const orderBox = rawOrderBox !== null ? processedQty : null;
+        const orderQty = rawOrderBox !== null && bcs ? processedQty * bcs : rawOrderQty;
+
         return {
           ...row,
           itemName: row.item_name,
           brandName: row.brand_name,
           liquorType: row.liquor_type,
           closingQty: row.closing_qty,
-          orderQty: isNaN(oq) ? 0 : oq
+          bcs,
+          orderQty,
+          orderBox,
+          qtyType,
+          displayQty
         };
       })
       .filter(row => row.orderQty > 0);
@@ -532,12 +572,8 @@ const PurchaseOrder = () => {
       let totalOrderBox = 0;
 
       itemsForActiveParty.forEach((item) => {
-        const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : 0;
-        const bcs = item.bcs !== null && item.bcs !== undefined ? parseFloat(item.bcs) : 0;
-        const orderBox = (orderQty && bcs) ? orderQty / bcs : 0;
-        
-        totalOrderQty += orderQty;
-        totalOrderBox += orderBox;
+        totalOrderQty += item.orderQty || 0;
+        totalOrderBox += item.orderBox || 0;
       });
 
       const { data: insertedData, error: dbErr } = await supabase
@@ -704,25 +740,7 @@ const PurchaseOrder = () => {
         </div>
       )}
 
-      {!isLoading && dbParties.length > 0 && !activeParty && (
-        <div className="po-empty" style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '48px 24px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <ShoppingCart size={48} style={{ marginBottom: 16, color: '#4f46e5' }} />
-          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#0f172a', marginBottom: '8px' }}>Select a Vendor</h2>
-          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', maxWidth: '360px', textAlign: 'center', margin: '0 auto 24px auto' }}>
-            Please select a vendor from the dropdown to generate, view, and submit their Purchase Order.
-          </p>
-          <div style={{ display: 'inline-block', width: '100%', maxWidth: '300px', textAlign: 'left' }}>
-            <SearchableDropdown 
-              options={dbParties} 
-              value={activeParty} 
-              onChange={setActiveParty} 
-              placeholder="Select a vendor..."
-            />
-          </div>
-        </div>
-      )}
-
-      {!isLoading && dbParties.length > 0 && activeParty && (
+      {!isLoading && dbParties.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }} ref={printRef}>
           <PODocument
             id="pdf-trader"

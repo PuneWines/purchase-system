@@ -172,7 +172,7 @@ const Indent = () => {
     const partyNameIdx = getIndex(['party name'], ['party name', 'party', 'shop', 'store']);
     const itemNameIdx = getIndex(['item name'], ['item name', 'item', 'product', 'particulars', 'description']);
     const brandNameIdx = getIndex(['brand name'], ['brand name', 'brand']);
-    const mlsIdx = getIndex(['size (mls)', 'size (mis)', 'size(mls)', 'size(mis)'], ['size (mls)', 'size (mis)', 'size', 'mls', 'ml', 'volume']);
+    const mlsIdx = getIndex(['size (mls)', 'size (mis)', 'size(mls)', 'size(mis)', 'size (ml)', 'size(ml)', 'mls', 'ml', 'size', 'volume'], ['size (ml)', 'size(ml)', 'size (mls)', 'size (mis)', 'mls', 'ml', 'volume']);
     const liquorTypeIdx = getIndex(['liquor type'], ['liquor type', 'liquor', 'type', 'category']);
     // 'qty out' / 'quantity out' only — NOT 'sale' to avoid matching avg-sale columns
     const qtyOutIdx = getIndex(['quantity out', 'qty out', 'qty out (bottles)'], ['quantity out', 'qty out', 'opening stock']);
@@ -180,7 +180,7 @@ const Indent = () => {
     const closingQtyIdx = getIndex(['closing stock in bottle', 'closing qty', 'closing quantity', 'closing stock (bottles)'],
       ['closing stock in bottle', 'closing qty', 'closing', 'balance']);
     // bpc = bottles per case; also b/cs, bcs
-    const bcsIdx = getIndex(['bpc', 'b/cs', 'bcs', 'bottles per case'], ['bpc', 'b/cs', 'bcs', 'b cs', 'bottles per case', 'per case']);
+    const bcsIdx = getIndex(['bpc', 'b/cs', 'bcs', 'bottles per case', 'pack size'], ['bpc', 'b/cs', 'bcs', 'b cs', 'bottles per case', 'per case', 'pack size']);
 
     // Hard fallbacks to exact column positions if no header matched
     const fPartyName = partyNameIdx !== -1 ? partyNameIdx : (headers.length > 4 ? 4 : -1);
@@ -338,7 +338,9 @@ const Indent = () => {
       lastMonthSale = getActive(row.lastMonthSale, row.qtyOut / row.bcs);
       perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, (row.qtyOut / daysDivisor) / row.bcs);
       finalAvgSale = getActive(row.finalAvgSale, (row.avgSale + perDaySaleLastMonth) / 2);
-      thresholdSale = getActive(row.thresholdSale, finalAvgSale * 6);
+      const typeKey = (row.liquorType || "").trim().toUpperCase();
+      const multiplier = thresholdDays[typeKey] !== undefined ? thresholdDays[typeKey] : 6;
+      thresholdSale = getActive(row.thresholdSale, finalAvgSale * multiplier);
       boxClosingQty = getActive(row.boxClosingQty, Math.max(0, row.closingQty) / row.bcs);
       orderBox = getActive(row.orderBox, thresholdSale - boxClosingQty);
       orderQty = getActive(row.orderQty, orderBox * row.bcs);
