@@ -434,6 +434,46 @@ export const sendOTNotification = async (
 };
 
 /**
+ * Generate a secure, lightweight hash for a specific role and PO ID.
+ * Since this is processed client-side, we use a simple, robust rolling hash.
+ */
+export const generateRoleToken = (poId, role) => {
+  const SECRET = "drinqkart-secure-pms-key-2026";
+  const str = `${poId}-${role}-${SECRET}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+};
+
+const appendTokenToLink = (confirmLink, role) => {
+  if (!confirmLink) return confirmLink;
+  try {
+    const urlObj = new URL(confirmLink);
+    const pathParts = urlObj.pathname.split('/');
+    const poId = pathParts[pathParts.length - 1];
+    if (poId) {
+      const token = generateRoleToken(poId, role);
+      urlObj.searchParams.set("token", token);
+      return urlObj.toString();
+    }
+  } catch (err) {
+    const parts = confirmLink.split('?');
+    const path = parts[0];
+    const pathParts = path.split('/');
+    const poId = pathParts[pathParts.length - 1];
+    if (poId) {
+      const token = generateRoleToken(poId, role);
+      return `${confirmLink}${confirmLink.includes('?') ? '&' : '?'}token=${token}`;
+    }
+  }
+  return confirmLink;
+};
+
+/**
  * Send the purchase order confirmation message
  * 
  * @param {string} phoneNumber - Vendor's phone number
@@ -447,6 +487,7 @@ export const sendOTNotification = async (
 export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumber, confirmLink, companyName, totalQty, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending PO confirmation notification...");
+    const secureLink = appendTokenToLink(confirmLink, "vendor");
 
     const message = `📩 *Purchase Order Notification*
 
@@ -457,7 +498,7 @@ Dear *${vendorName}*,
 *Total Qty:* ${totalQty}
 
 🔗 *Action Required Link:*
-${confirmLink}
+${secureLink}
 
 ✅ Please click the above link to confirm the order, specify your dispatch date, or provide remarks.
 
@@ -492,6 +533,7 @@ TEAM ${companyName || 'DRINQKART'}`;
 export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending Transporter confirmation notification...");
+    const secureLink = appendTokenToLink(confirmLink, "transporter");
 
     const message = `🚚 *Pick-up Request Notification*
 
@@ -503,7 +545,7 @@ You have a new pick-up request from *${companyName || 'DRINQKART'}*.
 *Vendor Name:* ${vendorName}
 
 🔗 *Action Required Link:*
-${confirmLink}
+${secureLink}
 
 ✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.
 
@@ -538,6 +580,7 @@ TEAM ${companyName || 'DRINQKART'}`;
 export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending Receiver confirmation notification...");
+    const secureLink = appendTokenToLink(confirmLink, "receiver");
 
     const message = `📦 *Delivery Alert*
 
@@ -548,7 +591,7 @@ A new delivery from *${vendorName}* is on its way to *${companyName || 'DRINQKAR
 *PO Number:* ${poNumber}
 
 🔗 *Action Required Link:*
-${confirmLink}
+${secureLink}
 
 ✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.
 

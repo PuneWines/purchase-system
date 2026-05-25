@@ -33,15 +33,23 @@ const ProtectedRoute = ({ children }) => {
 const AppContent = () => {
   const { toasts, removeToast } = useToast();
   const { currentUser, initSession } = useAuthStore();
+  const location = useLocation();
 
   useEffect(() => {
     initSession();
   }, [initSession]);
 
+  const isConfirmationPage = 
+    location.pathname.startsWith("/confirm-po/") ||
+    location.pathname.startsWith("/transporter-confirmation/") ||
+    location.pathname.startsWith("/receiver-confirmation/");
+
+  const showSidebar = currentUser && !isConfirmationPage;
+
   return (
     <div className="app-layout">
-      {currentUser && <Sidebar />}
-      <main className={`main-content ${!currentUser ? 'full-width' : ''}`}>
+      {showSidebar && <Sidebar />}
+      <main className={`main-content ${!showSidebar ? 'full-width' : ''}`}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
