@@ -826,7 +826,7 @@ const Indent = () => {
                   <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Party Name</th>
 
                   <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Last Month sale in box</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Per day sale </th>
+                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Per day sale in Box </th>
                   <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Final Avg Sale</th>
                   <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Threshold sale</th>
                   <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Closing qty in Box</th>
