@@ -339,7 +339,10 @@ const Indent = () => {
       perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, (row.qtyOut / daysDivisor) / row.bcs);
       finalAvgSale = getActive(row.finalAvgSale, (row.avgSale + perDaySaleLastMonth) / 2);
       const typeKey = (row.liquorType || "").trim().toUpperCase();
-      const multiplier = thresholdDays[typeKey] !== undefined ? thresholdDays[typeKey] : 6;
+      const matchedKey = typeKey ? Object.keys(thresholdDays).find(
+        key => typeKey.includes(key) || key.includes(typeKey)
+      ) : null;
+      const multiplier = matchedKey ? thresholdDays[matchedKey] : 6;
       thresholdSale = getActive(row.thresholdSale, finalAvgSale * multiplier);
       boxClosingQty = getActive(row.boxClosingQty, Math.max(0, row.closingQty) / row.bcs);
       orderBox = getActive(row.orderBox, thresholdSale - boxClosingQty);

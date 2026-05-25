@@ -31,6 +31,46 @@ const Approval = () => {
     }
   };
 
+  const handleInlineChange = (itemId, field, value) => {
+    setGroupedApprovals(prev => {
+      const updated = { ...prev };
+      const currentItems = updated[selectedIndentId] || [];
+      const itemIndex = currentItems.findIndex(i => i.id === itemId);
+      if (itemIndex !== -1) {
+        const item = { ...currentItems[itemIndex] };
+        let numVal = value === "" ? null : parseFloat(value);
+        item[field] = numVal;
+
+        const bcs = parseFloat(item.bcs) || 0;
+        if (bcs > 0) {
+          if (field === 'order_box' && numVal !== null) {
+            item.order_qty = parseFloat((numVal * bcs).toFixed(2));
+          } else if (field === 'order_qty' && numVal !== null) {
+            item.order_box = parseFloat((numVal / bcs).toFixed(2));
+          }
+        }
+        currentItems[itemIndex] = item;
+      }
+      return updated;
+    });
+  };
+
+  const inlineInputStyle = {
+    width: '100%',
+    minWidth: '70px',
+    padding: '6px 8px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '4px',
+    backgroundColor: '#fff',
+    fontSize: '13px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s',
+    fontWeight: '700',
+    color: '#4338ca',
+    textAlign: 'right'
+  };
+
   const fetchApprovals = async () => {
     setIsLoading(true);
     try {
@@ -94,7 +134,9 @@ const Approval = () => {
           .from("indent_items")
           .update({ 
             approval_status: indentStatuses[item.id],
-            unique_indent_id: selectedIndentId
+            unique_indent_id: selectedIndentId,
+            order_box: parseFloat(item.order_box) || 0,
+            order_qty: parseFloat(item.order_qty) || 0
           })
           .eq("id", item.id)
       );
@@ -420,10 +462,8 @@ const Approval = () => {
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Qty</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Avg Sale</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Closing Qty</th>
-                      <th style={thStyle}>Brand Name</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>B/Cs</th>
                       <th style={thStyle}>Mls</th>
-                      <th style={thStyle}>Liquor Type</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -469,14 +509,38 @@ const Approval = () => {
                         </td>
                         <td style={{ ...tdStyle, color: '#64748b' }}>{item.party_indent_id || "-"}</td>
                         <td style={tdStyle}>{item.item_name}</td>
-                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</td>
-                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_qty || "-"}</td>
+                        <td style={{ ...tdStyle, padding: activeTab === 'history' ? '12px 16px' : '4px 8px' }}>
+                          {activeTab === 'history' ? (
+                            <span style={{ fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.order_box !== undefined && item.order_box !== null ? item.order_box : ""}
+                              onChange={(e) => handleInlineChange(item.id, 'order_box', e.target.value)}
+                              style={inlineInputStyle}
+                              placeholder="-"
+                            />
+                          )}
+                        </td>
+                        <td style={{ ...tdStyle, padding: activeTab === 'history' ? '12px 16px' : '4px 8px' }}>
+                          {activeTab === 'history' ? (
+                            <span style={{ fontWeight: '700', color: '#4338ca' }}>{item.order_qty || "-"}</span>
+                          ) : (
+                            <input
+                              type="number"
+                              step="any"
+                              value={item.order_qty !== undefined && item.order_qty !== null ? item.order_qty : ""}
+                              onChange={(e) => handleInlineChange(item.id, 'order_qty', e.target.value)}
+                              style={inlineInputStyle}
+                              placeholder="-"
+                            />
+                          )}
+                        </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.fix_per_day_avg_sale || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
-                        <td style={tdStyle}>{item.brand_name || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
                         <td style={tdStyle}>{item.mls || "-"}</td>
-                        <td style={tdStyle}>{item.liquor_type || "-"}</td>
                       </tr>
                     )})}
                   </tbody>
