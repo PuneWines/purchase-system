@@ -24,12 +24,13 @@ const Login = () => {
     e.preventDefault();
     setErrorMsg("");
     
-    if (!username || !password) {
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password) {
       setErrorMsg("Please enter both username and password");
       return;
     }
 
-    const res = await login(username, password);
+    const res = await login(trimmedUsername, password);
     if (!res.success) {
       setErrorMsg(res.error);
     } else {
@@ -114,6 +115,8 @@ const Login = () => {
                   placeholder="Enter your username"
                   disabled={loading}
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </div>
             </div>
@@ -138,6 +141,8 @@ const Login = () => {
                   placeholder="Enter your password"
                   disabled={loading}
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   style={{ paddingRight: "3rem" }}
                 />
                 <button
