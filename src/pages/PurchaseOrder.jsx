@@ -241,13 +241,17 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
             {isReceiver ? (
               <>
                 <th className="po-text-center">Closing Stock in Bottle</th>
-                <th className="po-text-center">Order in Box</th>
+                <th className="po-text-center">Order Quantity</th>
                 <th className="po-text-center">Qty Type</th>
+                <th className="po-text-center">B/cs</th>
+                <th className="po-text-center">Order Bottles</th>
               </>
             ) : (
               <>
                 <th className="po-text-center">Qty Type</th>
                 <th className="po-text-center">Order Quantity</th>
+                <th className="po-text-center">B/cs</th>
+                <th className="po-text-center">Order Bottles</th>
               </>
             )}
           </tr>
@@ -270,6 +274,12 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
                     <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
                       {item.qtyType || "—"}
                     </td>
+                    <td className="po-text-center">
+                      {item.bcs != null ? item.bcs : "—"}
+                    </td>
+                    <td className="po-text-center" style={{ fontWeight: '600' }}>
+                      {item.orderQty ? Math.ceil(item.orderQty).toLocaleString("en-IN") : "—"}
+                    </td>
                   </>
                 ) : (
                   <>
@@ -279,13 +289,19 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
                     <td className="po-text-center">
                       {item.displayQty || "—"}
                     </td>
+                    <td className="po-text-center">
+                      {item.bcs != null ? item.bcs : "—"}
+                    </td>
+                    <td className="po-text-center" style={{ fontWeight: '600' }}>
+                      {item.orderQty ? Math.ceil(item.orderQty).toLocaleString("en-IN") : "—"}
+                    </td>
                   </>
                 )}
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={isReceiver ? 5 : 4} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
+              <td colSpan={isReceiver ? 7 : 6} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
                 Please select a vendor above to view the items list.
               </td>
             </tr>
@@ -428,10 +444,14 @@ const PurchaseOrder = () => {
         const rawOrderQty = isNaN(oq) ? 0 : oq;
         const rawOrderBox = rawOrderQty && bcs ? rawOrderQty / bcs : null;
         
-        const { qtyType, displayQty, processedQty } = processQuantity(rawOrderBox);
+        const { qtyType, processedQty } = processQuantity(rawOrderBox);
         
         const orderBox = rawOrderBox !== null ? processedQty : null;
         const orderQty = rawOrderBox !== null && bcs ? processedQty * bcs : rawOrderQty;
+
+        const displayQty = qtyType === "Box" 
+          ? processedQty.toString() 
+          : Math.ceil(orderQty).toString();
 
         return {
           ...row,
