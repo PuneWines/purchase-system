@@ -88,8 +88,9 @@ const TransporterVerification = () => {
   ];
 
   const filteredData = useMemo(() => {
-    if (selectedShop === "All") return data;
-    return data.filter(item => item.shop_name === selectedShop);
+    const nonKunalData = data.filter(item => item.shop_name?.toUpperCase() !== "KUNAL");
+    if (selectedShop === "All") return nonKunalData;
+    return nonKunalData.filter(item => item.shop_name === selectedShop);
   }, [data, selectedShop]);
 
   return (

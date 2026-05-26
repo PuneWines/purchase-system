@@ -158,6 +158,7 @@ const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
 /* ── Sub-component: single PO document ─────────────────────── */
 const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDate, dbParties = [], onPartyChange, vendorDetails, companyInfo, companyTerms, transporters = [], receivers = [], selectedTransporter, setSelectedTransporter, selectedReceiver, setSelectedReceiver, shippingError }) => {
   const orderQtyRows = items;
+  const isKunalShop = items.some(item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL");
 
   const totalBoxes = orderQtyRows
     .filter(r => r.qtyType === "Box")
@@ -347,7 +348,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
           {shippingError && <div className="shipping-error-msg">{shippingError}</div>}
           <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
             <div className="shipping-field">
-              <strong>Transporter: <span style={{color: 'red'}}>*</span></strong>
+              <strong>Transporter: {isKunalShop ? <span style={{color: '#64748b', fontSize: '0.85em', fontWeight: 'normal'}}>(Not Required)</span> : <span style={{color: 'red'}}>*</span>}</strong>
               <select 
                 className="shipping-select" 
                 value={selectedTransporter} 
@@ -357,7 +358,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
                   if (el) el.classList.remove('highlight-error');
                 }}
               >
-                <option value="">Select Transporter</option>
+                <option value="">{isKunalShop ? "Transporter Not Required" : "Select Transporter"}</option>
                 {transporters.map((t) => (
                   <option key={t.id} value={t.contact_number}>{t.name}</option>
                 ))}
@@ -406,6 +407,7 @@ const PurchaseOrder = () => {
   const [selectedReceiver, setSelectedReceiver] = useState("");
   const [shippingError, setShippingError] = useState("");
   const printRef = useRef();
+  const isSubmittingRef = useRef(false);
 
   const fetchNextPoNumber = async () => {
     const yr = new Date().getFullYear();
@@ -482,21 +484,38 @@ const PurchaseOrder = () => {
   }, [filteredApprovedItems, activeParty]);
 
   const handleDownloadPDF = async () => {
+    if (isSubmittingRef.current || isUploading) return;
+
     if (!activeVendorDetails?.contact) {
       alert("Error: The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
       setShippingError("The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
       return;
     }
 
-    if (!selectedTransporter || !selectedReceiver) {
-      setShippingError("Please select both Transporter and Receiver before generating the PO.");
-      const shippingSection = document.getElementById('shipping-details-pdf-trader');
-      if (shippingSection) {
-        shippingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        shippingSection.classList.add('highlight-error');
-        setTimeout(() => shippingSection.classList.remove('highlight-error'), 2500);
+    const isKunalShop = itemsForActiveParty.some(item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL");
+
+    if (isKunalShop) {
+      if (!selectedReceiver) {
+        setShippingError("Please select Receiver before generating the PO.");
+        const shippingSection = document.getElementById('shipping-details-pdf-trader');
+        if (shippingSection) {
+          shippingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          shippingSection.classList.add('highlight-error');
+          setTimeout(() => shippingSection.classList.remove('highlight-error'), 2500);
+        }
+        return;
       }
-      return;
+    } else {
+      if (!selectedTransporter || !selectedReceiver) {
+        setShippingError("Please select both Transporter and Receiver before generating the PO.");
+        const shippingSection = document.getElementById('shipping-details-pdf-trader');
+        if (shippingSection) {
+          shippingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          shippingSection.classList.add('highlight-error');
+          setTimeout(() => shippingSection.classList.remove('highlight-error'), 2500);
+        }
+        return;
+      }
     }
     setShippingError("");
 
@@ -669,17 +688,19 @@ const PurchaseOrder = () => {
       setSelectedReceiver("");
       setShippingError("");
       
-      // Re-fetch next PO number for the next submission
+      // Re-fetch next PO number and refresh page data
       await fetchNextPoNumber();
+      await fetchPageData();
 
     } catch (error) {
       console.error("Error generating/uploading PDF:", error);
       alert("An error occurred during PDF export: " + error.message);
     } finally {
+      isSubmittingRef.current = false;
       setIsUploading(false);
-      receiverContainer.style.display = 'none';
-      docTrader.classList.remove('pdf-export');
-      docReceiver.classList.remove('pdf-export');
+      if (receiverContainer) receiverContainer.style.display = 'none';
+      if (docTrader) docTrader.classList.remove('pdf-export');
+      if (docReceiver) docReceiver.classList.remove('pdf-export');
     }
   }; // removed useCallback as state references are direct inside async func
 
@@ -697,11 +718,9 @@ const PurchaseOrder = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeParty, isUploading]);
 
-  useEffect(() => {
-    fetchCompanySettings();
-    const fetchData = async () => {
-      setIsLoading(true);
-      
+  const fetchPageData = async (shouldShowLoading = true) => {
+    if (shouldShowLoading) setIsLoading(true);
+    try {
       await fetchNextPoNumber();
       
       // Fetch approved indent items
@@ -709,6 +728,11 @@ const PurchaseOrder = () => {
         .from("indent_items")
         .select("*")
         .eq("approval_status", "approved");
+
+      // Fetch existing purchase orders
+      const { data: poData } = await supabase
+        .from("purchase_orders")
+        .select("indent_id, vendor_name");
 
       // Fetch indents to resolve shop_name
       const { data: indentsData } = await supabase
@@ -738,16 +762,32 @@ const PurchaseOrder = () => {
       if (recvData) setReceivers(recvData);
 
       if (!indentError && indentData) {
-        const enriched = indentData.map(item => ({
+        const existingPos = poData || [];
+        const filteredIndentData = indentData.filter(item => {
+          if (!item.unique_indent_id || !item.party_name) return true;
+          const hasPo = existingPos.some(
+            po => po.indent_id === item.unique_indent_id && 
+                  po.vendor_name?.trim().toLowerCase() === item.party_name?.trim().toLowerCase()
+          );
+          return !hasPo;
+        });
+
+        const enriched = filteredIndentData.map(item => ({
           ...item,
           shop_name: shopMap[item.indent_id] || "Unknown"
         }));
         setApprovedItems(enriched);
-        setActiveParty("");
       }
-      setIsLoading(false);
-    };
-    fetchData();
+    } catch (error) {
+      console.error("Error fetching page data:", error);
+    } finally {
+      if (shouldShowLoading) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanySettings();
+    fetchPageData();
   }, []);
 
 

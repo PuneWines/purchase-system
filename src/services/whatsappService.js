@@ -1,6 +1,7 @@
 // ============================================================
 // WhatsApp Notification Service (Maytapi)
 // ============================================================
+import { supabase } from "../../utils/supabase";
 // Hardcoded recipient number for pharmacy indent approvals.
 // Change APPROVAL_PHONE_NUMBER to the actual WhatsApp number
 // (include country code, no + or spaces, e.g. "919876543210").
@@ -520,6 +521,89 @@ const appendTokenToLink = (confirmLink, role) => {
 };
 
 /**
+ * Resolve the transporter's name from their phone number.
+ */
+const resolveTransporterName = async (phoneNumber) => {
+  if (!phoneNumber) return "Transporter";
+  try {
+    const cleanNum = phoneNumber.replace(/\D/g, "");
+    const last10 = cleanNum.substring(cleanNum.length - 10);
+    const { data } = await supabase
+      .from("transporters")
+      .select("name")
+      .or(`contact_number.eq.${cleanNum},contact_number.eq.${last10}`)
+      .limit(1);
+    if (data && data.length > 0) {
+      return data[0].name;
+    }
+  } catch (err) {
+    console.error("[WhatsApp] Error resolving transporter name:", err);
+  }
+  return "Transporter";
+};
+
+/**
+ * Resolve the receiver's name from their phone number.
+ */
+const resolveReceiverName = async (phoneNumber) => {
+  if (!phoneNumber) return "Receiver";
+  try {
+    const cleanNum = phoneNumber.replace(/\D/g, "");
+    const last10 = cleanNum.substring(cleanNum.length - 10);
+    const { data } = await supabase
+      .from("receivers")
+      .select("name")
+      .or(`contact_number.eq.${cleanNum},contact_number.eq.${last10}`)
+      .limit(1);
+    if (data && data.length > 0) {
+      return data[0].name;
+    }
+  } catch (err) {
+    console.error("[WhatsApp] Error resolving receiver name:", err);
+  }
+  return "Receiver";
+};
+
+/**
+ * Resolve the shop name from the PO number.
+ */
+const resolveShopName = async (poNumber) => {
+  if (!poNumber) return "";
+  try {
+    const { data: poRes } = await supabase
+      .from("purchase_orders")
+      .select("indent_id")
+      .eq("po_number", poNumber)
+      .limit(1);
+    
+    if (poRes && poRes.length > 0 && poRes[0].indent_id) {
+      const uniqueIndentId = poRes[0].indent_id;
+      const { data: itemRes } = await supabase
+        .from("indent_items")
+        .select("indent_id")
+        .eq("unique_indent_id", uniqueIndentId)
+        .limit(1);
+        
+      if (itemRes && itemRes.length > 0 && itemRes[0].indent_id) {
+        const parentIndentId = itemRes[0].indent_id;
+        const { data: indentRes } = await supabase
+          .from("indents")
+          .select("shop_name")
+          .eq("id", parentIndentId)
+          .single();
+          
+        if (indentRes) {
+          return indentRes.shop_name;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[WhatsApp] Error resolving shop name:", err);
+  }
+  return "";
+};
+
+/**
  * Send the purchase order confirmation message
  * 
  * @param {string} phoneNumber - Vendor's phone number
@@ -534,13 +618,15 @@ export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumbe
   try {
     console.log("[WhatsApp] Sending PO confirmation notification...");
     const secureLink = appendTokenToLink(confirmLink, "vendor");
+    const shopName = await resolveShopName(poNumber);
+    const finalShopName = shopName || companyName || 'DRINQKART';
 
     const message = `📩 *Purchase Order Notification*
 
 Dear *${vendorName}*,
 
 *PO Number:* ${poNumber}
-*Shop Name:* ${companyName || 'DRINQKART'}
+*Shop Name:* ${finalShopName}
 *Total Qty:* ${totalQty}
 
 🔗 *Action Required Link:*
@@ -549,7 +635,7 @@ ${secureLink}
 ✅ Please click the above link to confirm the order, specify your dispatch date, or provide remarks.
 
 THANKS & REGARDS
-TEAM ${companyName || 'DRINQKART'}`;
+TEAM ${finalShopName}`;
 
     const success = pdfUrl
       ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
@@ -582,14 +668,18 @@ export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, 
   try {
     console.log("[WhatsApp] Sending Transporter confirmation notification...");
     const secureLink = appendTokenToLink(confirmLink, "transporter");
+    const transporterName = await resolveTransporterName(phoneNumber);
+    const shopName = await resolveShopName(poNumber);
+    const finalShopName = shopName || companyName || 'DRINQKART';
 
     const message = `🚚 *Pick-up Request Notification*
 
-Dear Transporter,
+Dear *${transporterName}*,
 
-You have a new pick-up request from *${companyName || 'DRINQKART'}*.
+You have a new pick-up request from *${finalShopName}*.
 
 *PO Number:* ${poNumber}
+*Shop Name:* ${finalShopName}
 *Vendor Name:* ${vendorName}
 
 🔗 *Action Required Link:*
@@ -598,7 +688,7 @@ ${secureLink}
 ✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.
 
 THANKS & REGARDS
-TEAM ${companyName || 'DRINQKART'}`;
+TEAM ${finalShopName}`;
 
     const success = pdfUrl
       ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
@@ -631,14 +721,18 @@ export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, con
   try {
     console.log("[WhatsApp] Sending Receiver confirmation notification...");
     const secureLink = appendTokenToLink(confirmLink, "receiver");
+    const receiverName = await resolveReceiverName(phoneNumber);
+    const shopName = await resolveShopName(poNumber);
+    const finalShopName = shopName || companyName || 'DRINQKART';
 
     const message = `📦 *Delivery Alert*
 
-Dear Receiver,
+Dear *${receiverName}*,
 
-A new delivery from *${vendorName}* is on its way to *${companyName || 'DRINQKART'}*.
+A new delivery from *${vendorName}* is on its way to *${finalShopName}*.
 
 *PO Number:* ${poNumber}
+*Shop Name:* ${finalShopName}
 
 🔗 *Action Required Link:*
 ${secureLink}
@@ -646,7 +740,7 @@ ${secureLink}
 ✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.
 
 THANKS & REGARDS
-TEAM ${companyName || 'DRINQKART'}`;
+TEAM ${finalShopName}`;
 
     const success = pdfUrl
       ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)

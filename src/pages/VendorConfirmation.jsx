@@ -18,6 +18,7 @@ const VendorConfirmation = () => {
   const [dispatchDate, setDispatchDate] = useState("");
   const [remarks, setRemarks] = useState("");
   const [formError, setFormError] = useState("");
+  const [shopName, setShopName] = useState("Unknown");
 
   useEffect(() => {
     const fetchPO = async () => {
@@ -46,6 +47,27 @@ const VendorConfirmation = () => {
         if (data.trader_status) {
           setSubmitted(true);
         }
+
+        // Fetch shop name dynamically to support conditional transporter bypass
+        let resolvedShopName = "Unknown";
+        if (data.indent_id) {
+          const { data: itemData } = await supabase
+            .from("indent_items")
+            .select("indent_id")
+            .eq("unique_indent_id", data.indent_id)
+            .limit(1);
+          if (itemData && itemData.length > 0 && itemData[0].indent_id) {
+            const { data: indentData } = await supabase
+              .from("indents")
+              .select("shop_name")
+              .eq("id", itemData[0].indent_id)
+              .single();
+            if (indentData) {
+              resolvedShopName = indentData.shop_name;
+            }
+          }
+        }
+        setShopName(resolvedShopName);
       } catch (err) {
         console.error("Error fetching PO:", err);
         setError("Purchase Order not found or an error occurred.");
@@ -78,38 +100,71 @@ const VendorConfirmation = () => {
 
     setSubmitting(true);
     try {
+      const isKunalShop = shopName?.toUpperCase() === "KUNAL";
+      const updatePayload = {
+        trader_status: status,
+        dispatch_date: dispatchDate || null,
+        remarks: remarks || null
+      };
+
+      if (status === "yes" && isKunalShop) {
+        updatePayload.transporter_status = "yes";
+        updatePayload.pickup_date = dispatchDate || null;
+        updatePayload.transporter_remarks = "Transporter Bypassed (KUNAL Shop)";
+      }
+
       const { error } = await supabase
         .from("purchase_orders")
-        .update({
-          trader_status: status,
-          dispatch_date: dispatchDate || null,
-          remarks: remarks || null
-        })
+        .update(updatePayload)
         .eq("id", id);
 
       if (error) throw error;
       
-      // If vendor confirmed and a transporter is assigned, trigger the transporter message
-      if (status === "yes" && poData.transporter_number) {
+      // If vendor confirmed, trigger the correct WhatsApp flow
+      if (status === "yes") {
         const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-        const confirmLink = `${baseUrl}/transporter-confirmation/${id}`;
         
-        let formattedPhone = poData.transporter_number.replace(/\D/g, "");
-        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+        if (isKunalShop) {
+          // Bypass transporter completely and send directly to receiver
+          if (poData.receiver_number) {
+            const confirmLink = `${baseUrl}/receiver-confirmation/${id}`;
+            let formattedPhone = poData.receiver_number.replace(/\D/g, "");
+            if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
 
-        // Try to trigger in background so it doesn't block UI too long
-        sendTransporterConfirmationMessage(
-          formattedPhone,
-          poData.po_number,
-          confirmLink,
-          "DRINQKART",
-          poData.vendor_name,
-          poData.receiver_pdf_url || poData.trader_pdf_url
-        ).then(res => {
-          if (!res.success) {
-            console.warn("Transporter message failed:", res.error);
+            import("../services/whatsappService").then(({ sendReceiverConfirmationMessage }) => {
+              sendReceiverConfirmationMessage(
+                formattedPhone,
+                poData.po_number,
+                confirmLink,
+                "DRINQKART",
+                poData.vendor_name,
+                poData.receiver_pdf_url || poData.trader_pdf_url
+              ).then(res => {
+                if (!res.success) {
+                  console.warn("Receiver message failed:", res.error);
+                }
+              });
+            });
           }
-        });
+        } else if (poData.transporter_number) {
+          // Regular transporter confirmation flow
+          const confirmLink = `${baseUrl}/transporter-confirmation/${id}`;
+          let formattedPhone = poData.transporter_number.replace(/\D/g, "");
+          if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+
+          sendTransporterConfirmationMessage(
+            formattedPhone,
+            poData.po_number,
+            confirmLink,
+            "DRINQKART",
+            poData.vendor_name,
+            poData.receiver_pdf_url || poData.trader_pdf_url
+          ).then(res => {
+            if (!res.success) {
+              console.warn("Transporter message failed:", res.error);
+            }
+          });
+        }
       }
       
       // Fetch latest data to display on success page
