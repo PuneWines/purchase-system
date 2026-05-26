@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { ChevronUp, ChevronDown, Search, Plus, Loader2, Trash2, Save } from "lucide-react";
+import { ChevronUp, ChevronDown, Search, Plus, Loader2, Trash2, Save, Edit2, X } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 import "../styles/Pages.css";
 
@@ -280,7 +280,6 @@ const MasterItem = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th className="col-checkbox">Edit</th>
                 <th className="sortable-header" onClick={() => requestSort('item_name')}>
                   <div className="header-content">
                     Item Name
@@ -305,7 +304,7 @@ const MasterItem = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="4" style={{ padding: '3rem', textAlign: 'center' }}>
+                  <td colSpan="3" style={{ padding: '3rem', textAlign: 'center' }}>
                     <Loader2 className="search-icon" style={{ animation: 'spin 1s linear infinite', margin: '0 auto', position: 'static', transform: 'none' }} size={24} />
                   </td>
                 </tr>
@@ -313,15 +312,6 @@ const MasterItem = () => {
                 const isEditing = editableRows[item.id] || false;
                 return (
                   <tr key={item.id}>
-                    <td className="col-checkbox">
-                      <input 
-                        type="checkbox"
-                        checked={isEditing}
-                        onChange={() => toggleEdit(item.id)}
-                        className="row-checkbox"
-                        title={isEditing ? "Uncheck to cancel edit" : "Check to edit row"}
-                      />
-                    </td>
                     <td>
                       {isEditing ? (
                         <input 
@@ -349,31 +339,50 @@ const MasterItem = () => {
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {isEditing && (
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                          <button 
-                            onClick={() => handleUpdate(item.id)} 
-                            style={{ color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                            title="Save changes"
-                          >
-                            <Save size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(item.id)} 
-                            style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                            title="Delete item"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                        {isEditing ? (
+                          <>
+                            <button 
+                              onClick={() => handleUpdate(item.id)} 
+                              style={{ color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                              title="Save changes"
+                            >
+                              <Save size={16} />
+                            </button>
+                            <button 
+                              onClick={() => toggleEdit(item.id)} 
+                              style={{ color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                              title="Cancel editing"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => toggleEdit(item.id)} 
+                              style={{ color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                              title="Edit item"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(item.id)} 
+                              style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                              title="Delete item"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
               {!isLoading && filteredAndSortedData.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="empty-state">
+                  <td colSpan="3" className="empty-state">
                     No items found matching your criteria.
                   </td>
                 </tr>
@@ -383,7 +392,7 @@ const MasterItem = () => {
         </div>
 
         {/* Mobile Cards */}
-        <div className="mobile-cards mobile-only">
+        {/* <div className="mobile-cards mobile-only">
           {isLoading && (
             <div style={{ padding: '3rem', textAlign: 'center' }}>
                <Loader2 className="search-icon" style={{ animation: 'spin 1s linear infinite', margin: '0 auto', position: 'static', transform: 'none' }} size={24} />
@@ -393,41 +402,51 @@ const MasterItem = () => {
             const isEditing = editableRows[item.id] || false;
             return (
               <div key={item.id} className="mobile-card">
-                <div className="mobile-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input 
-                      type="checkbox"
-                      checked={isEditing}
-                      onChange={() => toggleEdit(item.id)}
-                      className="row-checkbox"
-                    />
-                    <span className="mobile-card-title">Edit Row</span>
-                  </div>
-                  {isEditing && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => handleUpdate(item.id)} 
-                        style={{ color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                        title="Save changes"
-                      >
-                        <Save size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item.id)} 
-                        style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                        title="Delete item"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
                 <div className="mobile-card-field">
-                  <label>Item Name</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label>Item Name</label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleUpdate(item.id)}
+                            style={{ color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Save changes"
+                          >
+                            <Save size={16} />
+                          </button>
+                          <button
+                            onClick={() => toggleEdit(item.id)}
+                            style={{ color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Cancel editing"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => toggleEdit(item.id)}
+                            style={{ color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Edit item"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Delete item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                   {isEditing ? (
-                    <input 
-                      type="text" 
-                      value={item.item_name} 
+                    <input
+                      type="text"
+                      value={item.item_name}
                       onChange={(e) => handleEditChange(item.id, 'item_name', e.target.value)}
                       className="edit-input"
                     />
@@ -438,10 +457,10 @@ const MasterItem = () => {
                 <div className="mobile-card-field">
                   <label>Fix per day avg sale</label>
                   {isEditing ? (
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       step="any"
-                      value={item.avg_sale} 
+                      value={item.avg_sale}
                       onChange={(e) => handleEditChange(item.id, 'avg_sale', e.target.value)}
                       className="edit-input"
                     />
@@ -457,7 +476,7 @@ const MasterItem = () => {
               No items found.
             </div>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );
