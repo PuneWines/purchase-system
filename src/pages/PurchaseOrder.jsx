@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Printer, ShoppingCart, ShoppingBag, Search, ChevronDown, Check, FileText, Download, UserCheck, RefreshCw, X } from "lucide-react";
 import { supabase } from "../../utils/supabase";
-import { sendPOConfirmationMessage } from '../services/whatsappService';
+import { sendPOConfirmationMessage, sendTransporterConfirmationMessage } from '../services/whatsappService';
 import useCompanyStore from "../store/useCompanyStore";
 import useShopStore from "../store/useShopStore";
 import "../styles/PurchaseOrder.css";
@@ -627,30 +627,57 @@ const PurchaseOrder = () => {
 
       const insertedPoId = insertedData[0]?.id;
 
-      // --- Send WhatsApp Message ---
+      // --- Send WhatsApp Messages ---
+      const whatsappPromises = [];
+
+      // 1. Send PO Confirmation to Trader/Vendor
       if (activeVendorDetails?.contact && insertedPoId) {
         const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
         const confirmLink = `${baseUrl}/confirm-po/${insertedPoId}`;
-        // Use the new whatsappService
         let formattedPhone = activeVendorDetails.contact.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
 
-        const result = await sendPOConfirmationMessage(
-          formattedPhone,
-          activeParty,
-          nextPoNumber,
-          confirmLink,
-          companySettings?.name || COMPANY.name,
-          totalOrderQty,
-          traderUrl
+        whatsappPromises.push(
+          sendPOConfirmationMessage(
+            formattedPhone,
+            activeParty,
+            nextPoNumber,
+            confirmLink,
+            companySettings?.name || COMPANY.name,
+            totalOrderQty,
+            traderUrl
+          ).then(res => ({ role: "Trader", success: res.success, error: res.error }))
         );
-        console.log(result);
+      }
 
-        if (result.success) {
-          console.log(`✅ Successfully sent WhatsApp confirmation message to ${activeParty} at ${formattedPhone}`);
-        } else {
-          console.error(`❌ Failed to send WhatsApp message to ${activeParty} (${activeVendorDetails.contact}):`, result.error);
-        }
+      // 2. Send Transporter Pick-up Request to Transporter
+      if (selectedTransporter && insertedPoId) {
+        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+        const confirmLink = `${baseUrl}/transporter-confirmation/${insertedPoId}`;
+        let formattedPhone = selectedTransporter.replace(/\D/g, "");
+        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+
+        whatsappPromises.push(
+          sendTransporterConfirmationMessage(
+            formattedPhone,
+            nextPoNumber,
+            confirmLink,
+            companySettings?.name || COMPANY.name,
+            activeParty,
+            traderUrl
+          ).then(res => ({ role: "Transporter", success: res.success, error: res.error }))
+        );
+      }
+
+      if (whatsappPromises.length > 0) {
+        const results = await Promise.all(whatsappPromises);
+        results.forEach(res => {
+          if (res.success) {
+            console.log(`✅ Successfully sent WhatsApp confirmation message to ${res.role}`);
+          } else {
+            console.error(`❌ Failed to send WhatsApp message to ${res.role}:`, res.error);
+          }
+        });
       }
 
       alert("Purchase Orders successfully generated and submitted to Supabase!");
