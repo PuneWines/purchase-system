@@ -60,16 +60,6 @@ const TraderVerification = () => {
         </a>
       ) : <span style={{ color: '#94a3b8' }}>N/A</span>
     },
-    {
-      key: "receiver_pdf_url",
-      label: "Receiver PDF",
-      sortable: false,
-      render: (url) => url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0052cc', textDecoration: 'none', fontWeight: 600 }}>
-          <FileText size={16} /> View Receiver
-        </a>
-      ) : <span style={{ color: '#94a3b8' }}>N/A</span>
-    },
     { 
       key: "trader_status", 
       label: "Trader Status", 
@@ -81,43 +71,7 @@ const TraderVerification = () => {
       }
     },
     { key: "dispatch_date", label: "Dispatch Date", sortable: true },
-    { 
-      key: "transporter_status", 
-      label: "Transporter Status", 
-      sortable: true,
-      render: (status) => {
-        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Picked-up</span>;
-        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
-        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
-      }
-    },
-    { key: "pickup_date", label: "Pick-up Date", sortable: true },
-    { key: "delivery_date", label: "Est. Delivery", sortable: true },
-    { 
-      key: "receiver_status", 
-      label: "Receiver Status", 
-      sortable: true,
-      render: (status) => {
-        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Received</span>;
-        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
-        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
-      }
-    },
-    { key: "totalReceivedQty", label: "Received Qty", sortable: true },
-    { 
-      key: "qtyDifference", 
-      label: "Difference", 
-      sortable: true,
-      render: (diff) => {
-        if (diff === null || diff === undefined) return <span>-</span>;
-        if (diff === 0) return <span style={{ color: "#16a34a", fontWeight: "600" }}>0</span>;
-        if (diff > 0) return <span style={{ color: "#f59e0b", fontWeight: "600" }}>+{diff}</span>;
-        return <span style={{ color: "#ef4444", fontWeight: "600" }}>{diff}</span>;
-      }
-    },
-    { key: "remarks", label: "Trader Remarks", sortable: false },
-    { key: "transporter_remarks", label: "Transporter Remarks", sortable: false },
-    { key: "receiver_remarks", label: "Receiver Remarks", sortable: false }
+    { key: "remarks", label: "Trader Remarks", sortable: false }
   ];
 
   return (
