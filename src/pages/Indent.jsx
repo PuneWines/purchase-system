@@ -1095,7 +1095,7 @@ const Indent = () => {
                               <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '12px', textTransform: 'uppercase' }}>
                                 <th style={{ padding: '12px 16px' }}>Party Name</th>
                                 <th style={{ padding: '12px 16px' }}>Item Name</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Avg Sale</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Final Avg Sale</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Box</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Qty</th>
                               </tr>
@@ -1105,7 +1105,7 @@ const Indent = () => {
                                 <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc', fontSize: '13px' }}>
                                   <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.party_name || "-"}</td>
                                   <td style={{ padding: '12px 16px', fontWeight: '500' }}>{item.item_name}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{item.fix_per_day_avg_sale || "-"}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_qty || "-"}</td>
                                 </tr>
