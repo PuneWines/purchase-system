@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 import { supabase } from "../../utils/supabase";
 import { Loader2, Archive, X, Eye } from "lucide-react";
@@ -9,6 +10,7 @@ const Approval = () => {
   const [indentStatuses, setIndentStatuses] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
+  const { selectedShop } = useShopStore();
 
   const handleStatusChange = (itemId, status) => {
     if (status === 'approved' && indentStatuses[itemId] !== 'approved') {
@@ -81,8 +83,23 @@ const Approval = () => {
 
       if (error) throw error;
 
+      // Fetch indents to resolve shop_name
+      const { data: indentsData } = await supabase
+        .from("indents")
+        .select("id, shop_name");
+
+      const shopMap = (indentsData || []).reduce((acc, ind) => {
+        acc[ind.id] = ind.shop_name;
+        return acc;
+      }, {});
+
+      const enriched = (data || []).map(item => ({
+        ...item,
+        shop_name: shopMap[item.indent_id] || "Unknown"
+      }));
+
       // Group by base party_indent_id (e.g., IN-1-01 -> IN-1)
-      const grouped = (data || []).reduce((acc, item) => {
+      const grouped = enriched.reduce((acc, item) => {
         const fullId = item.party_indent_id || "Unknown";
         let baseIndentId = fullId;
         const parts = fullId.split('-');
@@ -99,7 +116,7 @@ const Approval = () => {
       
       // Pre-fill existing statuses if they exist in DB
       const initialStatuses = {};
-      (data || []).forEach(item => {
+      enriched.forEach(item => {
         if (item.approval_status && item.approval_status !== 'pending') {
           initialStatuses[item.id] = item.approval_status;
         }
@@ -194,11 +211,13 @@ const Approval = () => {
   };
 
   const pendingBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
-    return items.some(item => !item.approval_status || item.approval_status === 'pending');
+    const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
+    return shopOk && items.some(item => !item.approval_status || item.approval_status === 'pending');
   });
 
   const historyBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
-    return items.every(item => item.approval_status && item.approval_status !== 'pending');
+    const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
+    return shopOk && items.every(item => item.approval_status && item.approval_status !== 'pending');
   });
 
   const displayedBatches = activeTab === "pending" ? pendingBatches : historyBatches;
@@ -273,6 +292,7 @@ const Approval = () => {
                 <tr>
                   <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
                   <th style={thStyle}>Indent ID</th>
+                  <th style={thStyle}>Shop Name</th>
                   {activeTab === 'history' && <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>}
                   <th style={thStyle}>Party Name</th>
                   <th style={thStyle}>1st Item Name</th>
@@ -284,11 +304,11 @@ const Approval = () => {
               <tbody>
                 {displayedBatches.map(([indentId, items], index) => (
                   <tr 
-                    key={indentId} 
-                    style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc', cursor: 'pointer', transition: 'background-color 0.2s' }} 
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'} 
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8fafc'}
-                    onClick={() => setSelectedIndentId(indentId)}
+                     key={indentId} 
+                     style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc', cursor: 'pointer', transition: 'background-color 0.2s' }} 
+                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'} 
+                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8fafc'}
+                     onClick={() => setSelectedIndentId(indentId)}
                   >
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <button 
@@ -337,6 +357,7 @@ const Approval = () => {
                       </button>
                     </td>
                     <td style={{ ...tdStyle, color: '#4338ca', fontWeight: '600' }}>{indentId}</td>
+                    <td style={tdStyle}>{items[0]?.shop_name || "-"}</td>
                     {activeTab === 'history' && (
                       <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)' }}>
@@ -457,6 +478,7 @@ const Approval = () => {
                     <tr>
                       <th style={{ ...thStyle, textAlign: 'center' }}>Approve / Reject</th>
                       <th style={thStyle}>Indent ID</th>
+                      <th style={thStyle}>Shop Name</th>
                       <th style={thStyle}>Item Name</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Box</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Qty</th>
@@ -508,6 +530,7 @@ const Approval = () => {
                           )}
                         </td>
                         <td style={{ ...tdStyle, color: '#64748b' }}>{item.party_indent_id || "-"}</td>
+                        <td style={tdStyle}>{item.shop_name || "-"}</td>
                         <td style={tdStyle}>{item.item_name}</td>
                         <td style={{ ...tdStyle, padding: activeTab === 'history' ? '12px 16px' : '4px 8px' }}>
                           {activeTab === 'history' ? (

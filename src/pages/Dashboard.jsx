@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import useShopStore from "../store/useShopStore";
 import { supabase } from "../../utils/supabase";
 import {
   TrendingUp,
@@ -34,17 +35,14 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Filters State
-  const [filterShop, setFilterShop] = useState("All");
+  // Filters State — shop filter comes from the global store (sidebar)
+  const { selectedShop: filterShop } = useShopStore();
   const [filterTimeframe, setFilterTimeframe] = useState("all"); // "all", "30days", "7days"
   const [searchQuery, setSearchQuery] = useState("");
 
   // UI Interactive States
   const [selectedPO, setSelectedPO] = useState(null);
   const [selectedDashboardIndent, setSelectedDashboardIndent] = useState(null);
-
-  // Available Shops list
-  const shops = ["FRIENDS", "VISHAL", "MADHURA", "KUNAL", "BALAJI"];
 
   // Fetch all dashboard data from Supabase
   const fetchDashboardData = async () => {
@@ -274,23 +272,6 @@ const Dashboard = () => {
         </div>
 
         <div className="header-actions">
-          {/* Shop Selection Filter */}
-          <div className="filter-dropdown-wrapper">
-            <Building2 size={16} className="dropdown-icon" />
-            <select
-              value={filterShop}
-              onChange={(e) => setFilterShop(e.target.value)}
-              className="glass-dropdown"
-              title="Filter by Shop"
-            >
-              <option value="All">All Shops</option>
-              {shops.map((shop) => (
-                <option key={shop} value={shop}>
-                  {shop} Shop
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Timeframe Buttons */}
           <div className="timeframe-tabs">

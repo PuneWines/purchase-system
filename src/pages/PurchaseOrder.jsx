@@ -3,6 +3,7 @@ import { Printer, ShoppingCart, ShoppingBag, Search, ChevronDown, Check, FileTex
 import { supabase } from "../../utils/supabase";
 import { sendPOConfirmationMessage } from '../services/whatsappService';
 import useCompanyStore from "../store/useCompanyStore";
+import useShopStore from "../store/useShopStore";
 import "../styles/PurchaseOrder.css";
 import html2pdf from "html2pdf.js";
 
@@ -245,6 +246,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
         <thead>
           <tr>
             <th className="po-text-center">S.No</th>
+            <th>Shop Name</th>
             <th>Item Name</th>
             {isReceiver ? (
               <>
@@ -268,6 +270,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
               {orderQtyRows.map((item, i) => (
                 <tr key={item.id || i}>
                   <td className="po-text-center">{i + 1}</td>
+                  <td><strong>{item.shopName || "—"}</strong></td>
                   <td><strong>{item.itemName || "—"}</strong></td>
                   
                   {isReceiver ? (
@@ -304,7 +307,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
               {/* Aligned Total Row inside Table */}
               {orderQtyRows.length > 0 && (
                 <tr style={{ fontWeight: 'bold', borderTop: '2px solid #94a3b8', backgroundColor: '#f8fafc' }}>
-                  <td colSpan={isReceiver ? 3 : 2} style={{ textAlign: 'right', padding: '10px 16px' }}><strong>Total:</strong></td>
+                  <td colSpan={isReceiver ? 4 : 3} style={{ textAlign: 'right', padding: '10px 16px' }}><strong>Total:</strong></td>
                   <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBoxes}</td>
                   <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBottles}</td>
                   <td className="po-text-center" style={{ padding: '10px 16px' }}></td>
@@ -313,7 +316,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
             </>
           ) : (
             <tr>
-              <td colSpan={isReceiver ? 6 : 5} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
+              <td colSpan={isReceiver ? 7 : 6} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
                 Please select a vendor above to view the items list.
               </td>
             </tr>
@@ -390,9 +393,9 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
    ══════════════════════════════════════════════════════════════ */
 const PurchaseOrder = () => {
   const { companySettings, fetchCompanySettings } = useCompanyStore();
+  const { selectedShop } = useShopStore();
   const [approvedItems, setApprovedItems] = useState([]);
   const [vendorsList, setVendorsList] = useState([]);
-  const [dbParties, setDbParties] = useState([]);
   const [activeParty, setActiveParty] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -425,9 +428,25 @@ const PurchaseOrder = () => {
     setNextPoNumber(`${yr}/PO-${String(nextSeq).padStart(2, "0")}`);
   };
 
+  const filteredApprovedItems = useMemo(() => {
+    if (selectedShop === "All") return approvedItems;
+    return approvedItems.filter(item => item.shop_name === selectedShop);
+  }, [approvedItems, selectedShop]);
+
+  const dbParties = useMemo(() => {
+    return [...new Set(filteredApprovedItems.map(d => d.party_name).filter(Boolean))];
+  }, [filteredApprovedItems]);
+
+  // If the activeParty is no longer valid for the selected shop filter, clear it
+  useEffect(() => {
+    if (activeParty && !dbParties.includes(activeParty)) {
+      setActiveParty("");
+    }
+  }, [selectedShop, dbParties, activeParty]);
+
   const itemsForActiveParty = useMemo(() => {
     if (!activeParty) return [];
-    return approvedItems
+    return filteredApprovedItems
       .filter(item => item.party_name === activeParty)
       .map(row => {
         const oq = parseFloat(row.order_qty ?? 0);
@@ -455,11 +474,12 @@ const PurchaseOrder = () => {
           orderQty,
           orderBox,
           qtyType,
-          displayQty
+          displayQty,
+          shopName: row.shop_name
         };
       })
       .filter(row => row.orderQty > 0);
-  }, [approvedItems, activeParty]);
+  }, [filteredApprovedItems, activeParty]);
 
   const handleDownloadPDF = async () => {
     if (!selectedTransporter || !selectedReceiver) {
@@ -678,6 +698,16 @@ const PurchaseOrder = () => {
         .select("*")
         .eq("approval_status", "approved");
 
+      // Fetch indents to resolve shop_name
+      const { data: indentsData } = await supabase
+        .from("indents")
+        .select("id, shop_name");
+
+      const shopMap = (indentsData || []).reduce((acc, ind) => {
+        acc[ind.id] = ind.shop_name;
+        return acc;
+      }, {});
+
       // Fetch vendors to populate unique party names and details
       const { data: vendorsData, error: vendorsError } = await supabase
         .from("vendors")
@@ -696,12 +726,11 @@ const PurchaseOrder = () => {
       if (recvData) setReceivers(recvData);
 
       if (!indentError && indentData) {
-        setApprovedItems(indentData);
-        
-        // Strictly show only parties that have approved indents in the dropdown
-        const approvedParties = [...new Set(indentData.map(d => d.party_name).filter(Boolean))];
-        setDbParties(approvedParties);
-        
+        const enriched = indentData.map(item => ({
+          ...item,
+          shop_name: shopMap[item.indent_id] || "Unknown"
+        }));
+        setApprovedItems(enriched);
         setActiveParty("");
       }
       setIsLoading(false);

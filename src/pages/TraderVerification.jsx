@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Table from "../components/Table";
 import { supabase } from "../../utils/supabase";
 import { FileText } from "lucide-react";
+import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 
 const TraderVerification = () => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { selectedShop } = useShopStore();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,6 +19,22 @@ const TraderVerification = () => {
         .order("created_at", { ascending: false });
 
       if (poData) {
+        // Fetch indents and indent_items to resolve shop_name
+        const { data: indents } = await supabase.from("indents").select("id, shop_name");
+        const { data: items } = await supabase.from("indent_items").select("indent_id, unique_indent_id");
+
+        const indentMap = (indents || []).reduce((acc, ind) => {
+          acc[ind.id] = ind.shop_name;
+          return acc;
+        }, {});
+
+        const itemMap = (items || []).reduce((acc, item) => {
+          if (item.unique_indent_id && item.indent_id) {
+            acc[item.unique_indent_id] = item.indent_id;
+          }
+          return acc;
+        }, {});
+
         const formatted = poData.map(item => {
           let totalReceivedQty = 0;
           if (item.received_items && typeof item.received_items === 'object') {
@@ -24,8 +42,13 @@ const TraderVerification = () => {
           }
           const diff = item.receiver_status === 'yes' ? totalReceivedQty - (Number(item.total_order_qty) || 0) : null;
           
+          // Resolve shop name
+          const parentIndentId = itemMap[item.indent_id];
+          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+
           return {
             ...item,
+            shop_name: shopName,
             formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
               day: "2-digit", month: "short", year: "numeric",
               hour: "2-digit", minute: "2-digit"
@@ -46,6 +69,7 @@ const TraderVerification = () => {
   const columns = [
     { key: "po_number", label: "PO Number", sortable: true },
     { key: "indent_id", label: "Indent ID", sortable: true },
+    { key: "shop_name", label: "Shop Name", sortable: true },
     { key: "vendor_name", label: "Vendor Name", sortable: true },
     { key: "first_brand_name", label: "1st Brand Name", sortable: true },
     { key: "total_order_qty", label: "Total Order Qty", sortable: true },
@@ -74,6 +98,11 @@ const TraderVerification = () => {
     { key: "remarks", label: "Trader Remarks", sortable: false }
   ];
 
+  const filteredData = useMemo(() => {
+    if (selectedShop === "All") return data;
+    return data.filter(item => item.shop_name === selectedShop);
+  }, [data, selectedShop]);
+
   return (
     <div className="page-container">
       <h1>Purchase Orders History</h1>
@@ -84,10 +113,10 @@ const TraderVerification = () => {
         <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading records...</div>
       ) : (
         <Table
-          data={data}
+          data={filteredData}
           columns={columns}
           title="Purchase Orders Log"
-          searchableColumns={["po_number", "indent_id", "vendor_name", "first_brand_name"]}
+          searchableColumns={["po_number", "indent_id", "shop_name", "vendor_name", "first_brand_name"]}
           showHeader={false}
         />
       )}

@@ -324,3 +324,105 @@
 }
 
 .logout-btn:active { transform: translateX(0); }
+
+/* ── Global Shop Filter Section ────────────────────────────── */
+.shop-filter-section {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.shop-filter-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.shop-pills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.shop-pill {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.shop-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+.shop-pill.active {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+}
+
+.shop-pill.pill-all         { border-color: #e2e8f0; }
+.shop-pill.pill-all.active  { background: #1e293b; border-color: #1e293b; }
+
+.shop-pill.pill-friends        { border-color: #dbeafe; }
+.shop-pill.pill-friends.active { background: linear-gradient(135deg,#3b82f6,#2563eb); border-color: #3b82f6; }
+
+.shop-pill.pill-vishal        { border-color: #d1fae5; }
+.shop-pill.pill-vishal.active { background: linear-gradient(135deg,#10b981,#059669); border-color: #10b981; }
+
+.shop-pill.pill-madhura        { border-color: #fef3c7; }
+.shop-pill.pill-madhura.active { background: linear-gradient(135deg,#f59e0b,#d97706); border-color: #f59e0b; }
+
+.shop-pill.pill-kunal        { border-color: #ede9fe; }
+.shop-pill.pill-kunal.active { background: linear-gradient(135deg,#8b5cf6,#7c3aed); border-color: #8b5cf6; }
+
+.shop-pill.pill-balaji        { border-color: #ffe4e6; }
+.shop-pill.pill-balaji.active { background: linear-gradient(135deg,#f43f5e,#e11d48); border-color: #f43f5e; }
+
+/* Collapsed state — just a color dot */
+.shop-filter-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.shop-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.shop-dot:hover { transform: scale(1.3); }
+
+.shop-dot-all     { background: #94a3b8; }
+.shop-dot-friends { background: #3b82f6; }
+.shop-dot-vishal  { background: #10b981; }
+.shop-dot-madhura { background: #f59e0b; }
+.shop-dot-kunal   { background: #8b5cf6; }
+.shop-dot-balaji  { background: #f43f5e; }

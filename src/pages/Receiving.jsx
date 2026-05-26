@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../../utils/supabase";
 import { 
   FileText, 
@@ -18,6 +18,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import Toast, { useToast } from "../components/Toast";
+import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 import "../styles/Receiving.css";
 
@@ -27,6 +28,7 @@ const Receiving = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending"); // "pending" or "history"
   const [searchQuery, setSearchQuery] = useState("");
+  const { selectedShop } = useShopStore();
   
   // Local editing states
   const [editingQtys, setEditingQtys] = useState({}); // { [poId]: { [itemId]: number } }
@@ -49,7 +51,32 @@ const Receiving = () => {
       if (poError) throw poError;
 
       if (poData && poData.length > 0) {
-        setData(poData);
+        // Fetch indents and indent_items to resolve shop_name
+        const { data: indents } = await supabase.from("indents").select("id, shop_name");
+        const { data: itemsAll } = await supabase.from("indent_items").select("indent_id, unique_indent_id");
+
+        const indentMap = (indents || []).reduce((acc, ind) => {
+          acc[ind.id] = ind.shop_name;
+          return acc;
+        }, {});
+
+        const itemMap = (itemsAll || []).reduce((acc, item) => {
+          if (item.unique_indent_id && item.indent_id) {
+            acc[item.unique_indent_id] = item.indent_id;
+          }
+          return acc;
+        }, {});
+
+        const enrichedPoData = poData.map(po => {
+          const parentIndentId = itemMap[po.indent_id];
+          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          return {
+            ...po,
+            shop_name: shopName
+          };
+        });
+
+        setData(enrichedPoData);
 
         // 2. Fetch approved indent items associated with the PO indents
         const indentIds = poData.map(po => po.indent_id).filter(Boolean);
@@ -215,19 +242,27 @@ const Receiving = () => {
     }
   };
 
-  // Map and categorize purchase orders based on their DB snapshot products
-  const poRecords = data.map(po => {
-    const products = getPoItemsData(po);
-    const pendingProducts = products.filter(p => p.dbReceivedQty !== p.orderQty);
-    const historyProducts = products.filter(p => p.dbReceivedQty === p.orderQty);
+  // Filter data by selected global shop name
+  const shopFilteredData = useMemo(() => {
+    if (selectedShop === "All") return data;
+    return data.filter(po => po.shop_name === selectedShop);
+  }, [data, selectedShop]);
 
-    return {
-      po,
-      products,
-      pendingProducts,
-      historyProducts
-    };
-  }).filter(record => record.products.length > 0); // Only process POs that actually have products
+  // Map and categorize purchase orders based on their DB snapshot products
+  const poRecords = useMemo(() => {
+    return shopFilteredData.map(po => {
+      const products = getPoItemsData(po);
+      const pendingProducts = products.filter(p => p.dbReceivedQty !== p.orderQty);
+      const historyProducts = products.filter(p => p.dbReceivedQty === p.orderQty);
+
+      return {
+        po,
+        products,
+        pendingProducts,
+        historyProducts
+      };
+    }).filter(record => record.products.length > 0); // Only process POs that actually have products
+  }, [shopFilteredData, itemsData]);
 
   // Filter records based on search query
   const filteredRecords = poRecords.filter(record => {
@@ -235,7 +270,8 @@ const Receiving = () => {
     if (!query) return true;
     return (
       record.po.po_number?.toLowerCase().includes(query) ||
-      record.po.vendor_name?.toLowerCase().includes(query)
+      record.po.vendor_name?.toLowerCase().includes(query) ||
+      record.po.shop_name?.toLowerCase().includes(query)
     );
   });
 
@@ -378,6 +414,10 @@ const Receiving = () => {
                       <span className="po-meta-value">{formattedDate}</span>
                     </div>
                     <div className="po-meta-item">
+                      <span className="po-meta-label">Shop Name</span>
+                      <span className="po-meta-value" style={{ fontWeight: '600', color: '#4f46e5' }}>{po.shop_name || "Unknown"}</span>
+                    </div>
+                    <div className="po-meta-item">
                       <span className="po-meta-label">Total Ordered</span>
                       <span className="po-meta-value">{totalOrderQty} Qty</span>
                     </div>
@@ -414,6 +454,7 @@ const Receiving = () => {
                         <thead>
                           <tr>
                             <th style={{ width: '60px', textAlign: 'center' }}>S.No</th>
+                            <th>Shop Name</th>
                             <th>Item Name</th>
                             <th>Brand</th>
                             <th style={{ width: '130px', textAlign: 'center' }}>Closing Stock</th>
@@ -431,6 +472,7 @@ const Receiving = () => {
                             return (
                               <tr key={p.id}>
                                 <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: '500' }}>{idx + 1}</td>
+                                <td style={{ fontWeight: '600', color: '#475569' }}>{po.shop_name || "Unknown"}</td>
                                 <td style={{ fontWeight: '600', color: '#1e293b' }}>{p.itemName}</td>
                                 <td style={{ color: '#64748b' }}>{p.brandName}</td>
                                 <td style={{ textAlign: 'center', color: '#475569' }}>{p.closingQty}</td>

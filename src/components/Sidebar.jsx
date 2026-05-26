@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import useAuthStore from "../store/useAuthStore";
 import useAppStore from "../store/useAppStore";
+import useShopStore from "../store/useShopStore";
 import {
   LayoutDashboard,
   List,
@@ -17,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  Store,
 } from "lucide-react";
 import "../styles/Sidebar.css";
 
@@ -56,6 +58,7 @@ const menuGroups = [
 const Sidebar = () => {
   const { currentUser, logout, hasPermission } = useAuthStore();
   const { sidebarCollapsed, toggleSidebar } = useAppStore();
+  const { selectedShop, setSelectedShop, shops } = useShopStore();
   const [hoveredItem, setHoveredItem] = React.useState(null);
   const [tooltipPos, setTooltipPos] = React.useState({ top: 0, left: 0 });
 
@@ -68,6 +71,30 @@ const Sidebar = () => {
 
   const handleMouseLeave = () => {
     setHoveredItem(null);
+  };
+
+  const shopColorClass = (shop) => {
+    switch (shop) {
+      case "All":      return "pill-all";
+      case "FRIENDS":  return "pill-friends";
+      case "VISHAL":   return "pill-vishal";
+      case "MADHURA":  return "pill-madhura";
+      case "KUNAL":    return "pill-kunal";
+      case "BALAJI":   return "pill-balaji";
+      default:         return "pill-all";
+    }
+  };
+
+  const shopDotClass = (shop) => {
+    switch (shop) {
+      case "All":      return "shop-dot-all";
+      case "FRIENDS":  return "shop-dot-friends";
+      case "VISHAL":   return "shop-dot-vishal";
+      case "MADHURA":  return "shop-dot-madhura";
+      case "KUNAL":    return "shop-dot-kunal";
+      case "BALAJI":   return "shop-dot-balaji";
+      default:         return "shop-dot-all";
+    }
   };
 
   return (
@@ -109,6 +136,32 @@ const Sidebar = () => {
           </>
         )}
       </div>
+
+      {/* ── Global Shop Filter ────────────────────────────── */}
+      {sidebarCollapsed ? (
+        <div className="shop-filter-collapsed" title={`Shop: ${selectedShop}`}>
+          <div className={`shop-dot ${shopDotClass(selectedShop)}`} />
+        </div>
+      ) : (
+        <div className="shop-filter-section">
+          <div className="shop-filter-label">
+            <Store size={10} />
+            Shop Filter
+          </div>
+          <div className="shop-pills-grid">
+            {["All", ...shops].map((shop) => (
+              <button
+                key={shop}
+                className={`shop-pill ${shopColorClass(shop)} ${selectedShop === shop ? "active" : ""}`}
+                onClick={() => setSelectedShop(shop)}
+                title={shop === "All" ? "Show All Shops" : `${shop} Shop`}
+              >
+                {shop === "All" ? "All Shops" : shop}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Navigation ───────────────────────────────────── */}
       <nav className="sidebar-menu">

@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Table from "../components/Table";
 import { supabase } from "../../utils/supabase";
 import { FileText } from "lucide-react";
+import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 
 const TransporterVerification = () => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { selectedShop } = useShopStore();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,13 +19,35 @@ const TransporterVerification = () => {
         .order("created_at", { ascending: false });
 
       if (poData) {
-        const formatted = poData.map(item => ({
-          ...item,
-          formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit"
-          })
-        }));
+        // Fetch indents and indent_items to resolve shop_name
+        const { data: indents } = await supabase.from("indents").select("id, shop_name");
+        const { data: items } = await supabase.from("indent_items").select("indent_id, unique_indent_id");
+
+        const indentMap = (indents || []).reduce((acc, ind) => {
+          acc[ind.id] = ind.shop_name;
+          return acc;
+        }, {});
+
+        const itemMap = (items || []).reduce((acc, item) => {
+          if (item.unique_indent_id && item.indent_id) {
+            acc[item.unique_indent_id] = item.indent_id;
+          }
+          return acc;
+        }, {});
+
+        const formatted = poData.map(item => {
+          const parentIndentId = itemMap[item.indent_id];
+          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+
+          return {
+            ...item,
+            shop_name: shopName,
+            formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit"
+            })
+          };
+        });
         setData(formatted);
       } else if (error) {
         console.error("Error fetching POs:", error);
@@ -35,6 +59,7 @@ const TransporterVerification = () => {
 
   const columns = [
     { key: "po_number", label: "PO Number", sortable: true },
+    { key: "shop_name", label: "Shop Name", sortable: true },
     { key: "vendor_name", label: "Vendor Name", sortable: true },
     { key: "transporter_number", label: "Transporter Contact", sortable: true },
     {
@@ -62,6 +87,11 @@ const TransporterVerification = () => {
     { key: "transporter_remarks", label: "Remarks", sortable: false }
   ];
 
+  const filteredData = useMemo(() => {
+    if (selectedShop === "All") return data;
+    return data.filter(item => item.shop_name === selectedShop);
+  }, [data, selectedShop]);
+
   return (
     <div className="page-container">
       <h1>Transporter Verification</h1>
@@ -72,10 +102,10 @@ const TransporterVerification = () => {
         <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading records...</div>
       ) : (
         <Table
-          data={data}
+          data={filteredData}
           columns={columns}
           title="Transporter Log"
-          searchableColumns={["po_number", "vendor_name", "transporter_number"]}
+          searchableColumns={["po_number", "vendor_name", "transporter_number", "shop_name"]}
           showHeader={false}
         />
       )}
