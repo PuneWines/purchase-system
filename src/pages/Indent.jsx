@@ -31,7 +31,6 @@ const Indent = () => {
         .from("indents")
         .select(`
           id,
-          indent_number,
           shop_name,
           status,
           created_at,
@@ -402,40 +401,18 @@ const Indent = () => {
         return;
       }
 
-      // 1. Fetch highest index from Supabase (checking both indents and indent_items tables)
+      // 1. Fetch highest party index from Supabase
       let nextPartyIndex = 1;
-      let maxIdx = 0;
-
-      const { data: maxIndentsData, error: maxIndentsError } = await supabase
-        .from("indents")
-        .select("indent_number")
-        .not("indent_number", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (!maxIndentsError && maxIndentsData && maxIndentsData.length > 0) {
-        maxIndentsData.forEach(row => {
-          if (row.indent_number && typeof row.indent_number === 'string') {
-            const parts = row.indent_number.split('-');
-            if (parts.length >= 2 && parts[0] === 'IN') {
-              const idx = parseInt(parts[1], 10);
-              if (!isNaN(idx) && idx > maxIdx) {
-                maxIdx = idx;
-              }
-            }
-          }
-        });
-      }
-
-      const { data: maxItemsData, error: maxItemsError } = await supabase
+      const { data: maxIdData, error: maxIdError } = await supabase
         .from("indent_items")
         .select("party_indent_id")
         .not("party_indent_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (!maxItemsError && maxItemsData && maxItemsData.length > 0) {
-        maxItemsData.forEach(row => {
+      if (!maxIdError && maxIdData && maxIdData.length > 0) {
+        let maxIdx = 0;
+        maxIdData.forEach(row => {
           if (row.party_indent_id && typeof row.party_indent_id === 'string') {
             const parts = row.party_indent_id.split('-');
             if (parts.length >= 3 && parts[0] === 'IN') {
@@ -446,14 +423,11 @@ const Indent = () => {
             }
           }
         });
+        nextPartyIndex = maxIdx + 1;
       }
 
-      nextPartyIndex = maxIdx + 1;
-
-      // 2. Generate Parent Indent ID & Insert Header record into `indents`
-      const mainIndentNumber = `IN-${nextPartyIndex}`;
+      // 2. Insert Header record into `indents`
       const headerPayload = {
-        indent_number: mainIndentNumber,
         shop_name: selectedShop || 'UNKNOWN',
         status: 'Pending'
       };
@@ -468,17 +442,21 @@ const Indent = () => {
       const indentId = headerData.id;
 
       // 3. Generate IDs and create Line Items payload
+      const partyMap = new Map();
       const itemsPayload = [];
-      let childIndex = 1;
 
       validItems.forEach(({ item, calcs }) => {
-        const partyIndentId = `${mainIndentNumber}-${childIndex.toString().padStart(2, '0')}`;
-        childIndex++;
+        const partyName = item.partyName || 'UNKNOWN';
+        if (!partyMap.has(partyName)) {
+          partyMap.set(partyName, { index: nextPartyIndex++, count: 1 });
+        }
+        const partyInfo = partyMap.get(partyName);
+        const currentCount = partyInfo.count++;
+        const partyIndentId = `IN-${partyInfo.index}-${currentCount.toString().padStart(2, '0')}`;
 
         itemsPayload.push({
           indent_id: indentId,
           party_indent_id: partyIndentId,
-          unique_indent_id: mainIndentNumber,
           item_name: item.itemName,
           fix_per_day_avg_sale: item.avgSale,
           qty_out: item.qtyOut,
@@ -1069,7 +1047,7 @@ const Indent = () => {
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>
-                          {history.indent_number ? `${history.indent_number} - ` : ""}{history.shop_name}
+                          {history.shop_name}
                         </h3>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                           <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>
