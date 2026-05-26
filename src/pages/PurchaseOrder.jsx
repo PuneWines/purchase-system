@@ -7,27 +7,6 @@ import useShopStore from "../store/useShopStore";
 import "../styles/PurchaseOrder.css";
 import html2pdf from "html2pdf.js";
 
-/* ── Helper: Process Quantity Logic ───────────────────────── */
-const processQuantity = (qtyInBox) => {
-  if (qtyInBox === null || qtyInBox === undefined || isNaN(qtyInBox)) {
-    return { qtyType: "—", displayQty: "—", processedQty: 0 };
-  }
-  const decimalPart = parseFloat((qtyInBox % 1).toFixed(4));
-  if (decimalPart === 0 || decimalPart < 0.0001 || decimalPart >= 0.90) {
-    const rounded = Math.round(qtyInBox);
-    return {
-      qtyType: "Box",
-      displayQty: rounded.toString(),
-      processedQty: rounded
-    };
-  } else {
-    return {
-      qtyType: "Bottles",
-      displayQty: qtyInBox.toFixed(2),
-      processedQty: qtyInBox
-    };
-  }
-};
 
 /* ── Constants ─────────────────────────────────────────────── */
 const COMPANY = {
@@ -451,19 +430,13 @@ const PurchaseOrder = () => {
     return filteredApprovedItems
       .filter(item => item.party_name === activeParty)
       .map(row => {
-        const oq = parseFloat(row.order_qty ?? 0);
+        const orderBox = row.order_box !== null ? parseFloat(row.order_box) : 0;
+        const orderQty = row.order_qty !== null ? parseFloat(row.order_qty) : 0;
         const bcs = row.bcs !== null ? parseFloat(row.bcs) : null;
-        
-        const rawOrderQty = isNaN(oq) ? 0 : oq;
-        const rawOrderBox = rawOrderQty && bcs ? rawOrderQty / bcs : null;
-        
-        const { qtyType, processedQty } = processQuantity(rawOrderBox);
-        
-        const orderBox = rawOrderBox !== null ? processedQty : null;
-        const orderQty = rawOrderBox !== null && bcs ? processedQty * bcs : rawOrderQty;
 
+        const qtyType = orderBox >= 0.90 ? "Box" : "Bottles";
         const displayQty = qtyType === "Box" 
-          ? processedQty.toString() 
+          ? Math.round(orderBox).toString() 
           : Math.ceil(orderQty).toString();
 
         return {

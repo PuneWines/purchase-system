@@ -145,18 +145,36 @@ const Approval = () => {
         return;
       }
 
-      // Batch update the items in Supabase
-      const promises = itemsToUpdate.map(item => 
-        supabase
+      // Batch update the items in Supabase with persistent rounding logic
+      const promises = itemsToUpdate.map(item => {
+        const status = indentStatuses[item.id];
+        let processedBox = parseFloat(item.order_box) || 0;
+        let processedQty = parseFloat(item.order_qty) || 0;
+
+        if (status === 'approved') {
+          if (processedBox >= 0.90) {
+            // Any quantity >= 0.90 is rounded to boxes:
+            // e.g. 0.91 -> 1, 1.24 -> 1 (round down to nearest whole number, but minimum is 1)
+            if (processedBox < 1.0) {
+              processedBox = 1;
+            } else {
+              processedBox = Math.floor(processedBox);
+            }
+            const bcs = parseFloat(item.bcs) || 0;
+            processedQty = bcs > 0 ? processedBox * bcs : processedQty;
+          }
+        }
+
+        return supabase
           .from("indent_items")
           .update({ 
-            approval_status: indentStatuses[item.id],
+            approval_status: status,
             unique_indent_id: selectedIndentId,
-            order_box: parseFloat(item.order_box) || 0,
-            order_qty: parseFloat(item.order_qty) || 0
+            order_box: processedBox,
+            order_qty: processedQty
           })
-          .eq("id", item.id)
-      );
+          .eq("id", item.id);
+      });
 
       const results = await Promise.all(promises);
       const errors = results.filter(r => r.error);
