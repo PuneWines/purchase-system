@@ -12,8 +12,8 @@ const processQuantity = (qtyInBox) => {
     return { qtyType: "—", displayQty: "—", processedQty: 0 };
   }
   const decimalPart = parseFloat((qtyInBox % 1).toFixed(4));
-  if (decimalPart >= 0.90) {
-    const rounded = Math.ceil(qtyInBox);
+  if (decimalPart === 0 || decimalPart < 0.0001 || decimalPart >= 0.90) {
+    const rounded = Math.round(qtyInBox);
     return {
       qtyType: "Box",
       displayQty: rounded.toString(),
@@ -158,8 +158,16 @@ const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
 const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDate, dbParties = [], onPartyChange, vendorDetails, companyInfo, companyTerms, transporters = [], receivers = [], selectedTransporter, setSelectedTransporter, selectedReceiver, setSelectedReceiver, shippingError }) => {
   const orderQtyRows = items;
 
-  const totalBoxes = orderQtyRows.reduce((s, r) => s + (r.orderBox || 0), 0);
-  const totalBottles = orderQtyRows.reduce((s, r) => s + (r.orderQty || 0), 0);
+  const totalBoxes = orderQtyRows
+    .filter(r => r.qtyType === "Box")
+    .reduce((s, r) => s + (r.orderBox || 0), 0);
+
+  const totalBottles = orderQtyRows
+    .filter(r => r.qtyType === "Bottles")
+    .reduce((s, r) => s + (r.orderQty || 0), 0);
+
+  const displayTotalBoxes = totalBoxes % 1 === 0 ? totalBoxes.toString() : totalBoxes.toFixed(2);
+  const displayTotalBottles = Math.ceil(totalBottles).toLocaleString("en-IN");
 
   return (
     <div className="po-document" id={id || `po-${poNumber.replace(/\//g, "-")}`}>
@@ -241,91 +249,77 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
             {isReceiver ? (
               <>
                 <th className="po-text-center">Closing Stock in Bottle</th>
-                <th className="po-text-center">Order Quantity</th>
+                <th className="po-text-center">Order Qty (Boxes)</th>
+                <th className="po-text-center">Order Qty (Bottles)</th>
                 <th className="po-text-center">Qty Type</th>
-                <th className="po-text-center">B/cs</th>
-                <th className="po-text-center">Order Bottles</th>
               </>
             ) : (
               <>
+                <th className="po-text-center">Order Qty (Boxes)</th>
+                <th className="po-text-center">Order Qty (Bottles)</th>
                 <th className="po-text-center">Qty Type</th>
-                <th className="po-text-center">Order Quantity</th>
-                <th className="po-text-center">B/cs</th>
-                <th className="po-text-center">Order Bottles</th>
               </>
             )}
           </tr>
         </thead>
         <tbody>
           {partyName ? (
-            orderQtyRows.map((item, i) => (
-              <tr key={item.id || i}>
-                <td className="po-text-center">{i + 1}</td>
-                <td><strong>{item.itemName || "—"}</strong></td>
-                
-                {isReceiver ? (
-                  <>
-                    <td className="po-text-center">
-                      {item.closingQty != null ? item.closingQty : "—"}
-                    </td>
-                    <td className="po-text-center">
-                      {item.displayQty || "—"}
-                    </td>
-                    <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                      {item.qtyType || "—"}
-                    </td>
-                    <td className="po-text-center">
-                      {item.bcs != null ? item.bcs : "—"}
-                    </td>
-                    <td className="po-text-center" style={{ fontWeight: '600' }}>
-                      {item.orderQty ? Math.ceil(item.orderQty).toLocaleString("en-IN") : "—"}
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                      {item.qtyType || "—"}
-                    </td>
-                    <td className="po-text-center">
-                      {item.displayQty || "—"}
-                    </td>
-                    <td className="po-text-center">
-                      {item.bcs != null ? item.bcs : "—"}
-                    </td>
-                    <td className="po-text-center" style={{ fontWeight: '600' }}>
-                      {item.orderQty ? Math.ceil(item.orderQty).toLocaleString("en-IN") : "—"}
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))
+            <>
+              {orderQtyRows.map((item, i) => (
+                <tr key={item.id || i}>
+                  <td className="po-text-center">{i + 1}</td>
+                  <td><strong>{item.itemName || "—"}</strong></td>
+                  
+                  {isReceiver ? (
+                    <>
+                      <td className="po-text-center">
+                        {item.closingQty != null ? item.closingQty : "—"}
+                      </td>
+                      <td className="po-text-center" style={item.qtyType === "Box" ? { fontWeight: '600' } : {}}>
+                        {item.qtyType === "Box" ? item.displayQty : "—"}
+                      </td>
+                      <td className="po-text-center" style={item.qtyType === "Bottles" ? { fontWeight: '600' } : {}}>
+                        {item.qtyType === "Bottles" ? item.displayQty : "—"}
+                      </td>
+                      <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                        {item.qtyType || "—"}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="po-text-center" style={item.qtyType === "Box" ? { fontWeight: '600' } : {}}>
+                        {item.qtyType === "Box" ? item.displayQty : "—"}
+                      </td>
+                      <td className="po-text-center" style={item.qtyType === "Bottles" ? { fontWeight: '600' } : {}}>
+                        {item.qtyType === "Bottles" ? item.displayQty : "—"}
+                      </td>
+                      <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                        {item.qtyType || "—"}
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+              
+              {/* Aligned Total Row inside Table */}
+              {orderQtyRows.length > 0 && (
+                <tr style={{ fontWeight: 'bold', borderTop: '2px solid #94a3b8', backgroundColor: '#f8fafc' }}>
+                  <td colSpan={isReceiver ? 3 : 2} style={{ textAlign: 'right', padding: '10px 16px' }}><strong>Total:</strong></td>
+                  <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBoxes}</td>
+                  <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBottles}</td>
+                  <td className="po-text-center" style={{ padding: '10px 16px' }}></td>
+                </tr>
+              )}
+            </>
           ) : (
             <tr>
-              <td colSpan={isReceiver ? 7 : 6} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
+              <td colSpan={isReceiver ? 6 : 5} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
                 Please select a vendor above to view the items list.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-
-      {/* ── Totals ──────────────────────────────────────────── */}
-      {partyName && (
-        <div className="po-totals-container">
-          <table className="po-totals-table">
-            <tbody>
-              <tr>
-                <td>Total Bottles</td>
-                <td>{Math.ceil(totalBottles).toLocaleString("en-IN")}</td>
-              </tr>
-              <tr>
-                <td>Total Boxes</td>
-                <td>{totalBoxes.toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
 
       {/* ── Footer: Terms + Signature ───────────────────────── */}
       <div className="po-footer-section">
@@ -334,9 +328,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
           <ol>
             {(companyTerms && companyTerms.length > 0 ? companyTerms : TERMS).map((t, i) => <li key={i}>{t}</li>)}
           </ol>
-          <div style={{ marginTop: 12, fontSize: "0.75rem", color: "#64748b" }}>
-            Mark any communications to {companyInfo?.email || COMPANY.email}
-          </div>
+          
         </div>
 
         <div className="po-signature-block">
