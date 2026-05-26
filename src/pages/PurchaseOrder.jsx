@@ -482,6 +482,12 @@ const PurchaseOrder = () => {
   }, [filteredApprovedItems, activeParty]);
 
   const handleDownloadPDF = async () => {
+    if (!activeVendorDetails?.contact) {
+      alert("Error: The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
+      setShippingError("The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
+      return;
+    }
+
     if (!selectedTransporter || !selectedReceiver) {
       setShippingError("Please select both Transporter and Receiver before generating the PO.");
       const shippingSection = document.getElementById('shipping-details-pdf-trader');
@@ -656,6 +662,12 @@ const PurchaseOrder = () => {
       }
 
       alert("Purchase Orders successfully generated and submitted to Supabase!");
+      
+      // Reset all model fields
+      setActiveParty("");
+      setSelectedTransporter("");
+      setSelectedReceiver("");
+      setShippingError("");
       
       // Re-fetch next PO number for the next submission
       await fetchNextPoNumber();

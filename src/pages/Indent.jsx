@@ -380,6 +380,145 @@ const Indent = () => {
     }
   };
 
+  const handleDeleteIndent = async (indentId) => {
+    if (!window.confirm("Are you sure you want to delete this entire indent?\n\nThis action will permanently delete all records of this indent and its items across all steps.\n\nAffected Tables:\n1. indents\n2. indent_items\n3. purchase_orders")) return;
+
+    setIsProcessing(true);
+    try {
+      // 1. Fetch approved indent items to identify any generated purchase orders
+      const { data: items, error: itemsError } = await supabase
+        .from('indent_items')
+        .select('unique_indent_id')
+        .eq('indent_id', indentId);
+
+      if (itemsError) throw itemsError;
+
+      const uniqueIndentIds = [...new Set((items || []).map(i => i.unique_indent_id).filter(Boolean))];
+
+      // 2. Delete linked purchase orders if any
+      if (uniqueIndentIds.length > 0) {
+        const { error: poError } = await supabase
+          .from('purchase_orders')
+          .delete()
+          .in('indent_id', uniqueIndentIds);
+        if (poError) throw poError;
+      }
+
+      // 3. Delete indent items
+      const { error: delItemsError } = await supabase
+        .from('indent_items')
+        .delete()
+        .eq('indent_id', indentId);
+      if (delItemsError) throw delItemsError;
+
+      // 4. Delete the parent indent record
+      const { error: delIndentError } = await supabase
+        .from('indents')
+        .delete()
+        .eq('id', indentId);
+      if (delIndentError) throw delIndentError;
+
+      addToast("Successfully deleted indent and associated pipeline records.", "success");
+      fetchSubmittedHistory();
+    } catch (error) {
+      console.error("Error deleting indent:", error);
+      addToast("Failed to delete indent: " + error.message, "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId, indentId) => {
+    if (!window.confirm("Are you sure you want to delete this specific item?\n\nThis action will delete the item from this indent and update or delete any associated Purchase Order.\n\nAffected Tables:\n1. indent_items\n2. purchase_orders")) return;
+
+    setIsProcessing(true);
+    try {
+      // 1. Fetch the item details
+      const { data: itemData, error: itemError } = await supabase
+        .from('indent_items')
+        .select('*')
+        .eq('id', itemId)
+        .single();
+      if (itemError) throw itemError;
+
+      const uniqueIndentId = itemData.unique_indent_id;
+      const vendorName = itemData.party_name;
+
+      // 2. Update/Delete associated Purchase Order if applicable
+      if (uniqueIndentId && vendorName) {
+        const { data: poData, error: poError } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .eq('indent_id', uniqueIndentId)
+          .eq('vendor_name', vendorName);
+
+        if (!poError && poData && poData.length > 0) {
+          const po = poData[0];
+
+          // Fetch other items in this indent for the same vendor/PO
+          const { data: otherItems } = await supabase
+            .from('indent_items')
+            .select('id')
+            .eq('unique_indent_id', uniqueIndentId)
+            .eq('party_name', vendorName)
+            .eq('approval_status', 'approved');
+
+          const remaining = (otherItems || []).filter(i => i.id !== itemId);
+
+          if (remaining.length === 0) {
+            // Delete PO entirely if it is empty
+            const { error: delPoError } = await supabase
+              .from('purchase_orders')
+              .delete()
+              .eq('id', po.id);
+            if (delPoError) throw delPoError;
+          } else {
+            // Subtract quantities and update JSONB received_items
+            const updatedReceivedItems = { ...(po.received_items || {}) };
+            delete updatedReceivedItems[itemId];
+
+            const newTotalQty = Math.max(0, (po.total_order_qty || 0) - (parseFloat(itemData.order_qty) || 0));
+            const newTotalBox = Math.max(0, (po.total_order_box || 0) - (parseFloat(itemData.order_box) || 0));
+
+            const { error: updPoError } = await supabase
+              .from('purchase_orders')
+              .update({
+                received_items: updatedReceivedItems,
+                total_order_qty: newTotalQty,
+                total_order_box: newTotalBox
+              })
+              .eq('id', po.id);
+            if (updPoError) throw updPoError;
+          }
+        }
+      }
+
+      // 3. Delete the item from indent_items
+      const { error: delItemError } = await supabase
+        .from('indent_items')
+        .delete()
+        .eq('id', itemId);
+      if (delItemError) throw delItemError;
+
+      addToast("Successfully deleted item from indent.", "success");
+
+      // Refresh items list for expanded view
+      const { data: refreshedItems } = await supabase
+        .from('indent_items')
+        .select('*')
+        .eq('indent_id', indentId);
+      setSubmissionItems(prev => ({ ...prev, [indentId]: refreshedItems || [] }));
+
+      // Refresh parent history to update item counts
+      fetchSubmittedHistory();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      addToast("Failed to delete item: " + error.message, "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleIndentSubmit = async () => {
     setIsProcessing(true);
     try {
@@ -1072,6 +1211,29 @@ const Indent = () => {
                         {history.status === 'Pending' ? <Clock size={12} /> : <CheckCircle size={12} />}
                         {history.status}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteIndent(history.id);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '6px',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        title="Delete entire indent batch"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                       <div style={{ color: isExpanded ? '#4f46e5' : '#94a3b8', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}>
                         <ChevronDown size={20} />
                       </div>
@@ -1098,6 +1260,7 @@ const Indent = () => {
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Final Avg Sale</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Box</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Qty</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Action</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1108,6 +1271,31 @@ const Indent = () => {
                                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_qty || "-"}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteItem(item.id, history.id);
+                                      }}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: '4px',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                      title="Delete specific product item"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
