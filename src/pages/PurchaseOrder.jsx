@@ -160,8 +160,8 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
             <ShoppingBag size={24} />
           </div>
           <div className="po-company-info">
-            <h1>{companyInfo?.name || COMPANY.name}</h1>
-            <p>{companyInfo?.address || COMPANY.address}</p>
+            <h1>{companyInfo?.name || "—"}</h1>
+            <p>{companyInfo?.address || "—"}</p>
           </div>
         </div>
 
@@ -210,11 +210,11 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
         <div className="po-box">
           <div className="po-box-header">Ship To:</div>
           <div className="po-box-body">
-            <strong>{companyInfo?.name || COMPANY.name}</strong><br />
-            {companyInfo?.address || COMPANY.address}<br />
-            <strong>GSTIN:</strong> {companyInfo?.gstin || COMPANY.gstin}<br />
-            <strong>Contact:</strong> {companyInfo?.contact || COMPANY.contact}<br />
-            <strong>Email:</strong> {companyInfo?.email || COMPANY.email}
+            <strong>{companyInfo?.name || "—"}</strong><br />
+            {companyInfo?.address || "—"}<br />
+            <strong>GSTIN:</strong> {companyInfo?.gstin || "—"}<br />
+            <strong>Contact:</strong> {companyInfo?.contact || "—"}<br />
+            <strong>Email:</strong> {companyInfo?.email || "—"}
           </div>
         </div>
       </div>
@@ -316,7 +316,7 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
 
         <div className="po-signature-block">
           <div className="po-signature-body"></div>
-          <div className="po-signature-header">For {companyInfo?.name || COMPANY.name}</div>
+          <div className="po-signature-header">For {companyInfo?.name || "—"}</div>
           <div className="po-signature-sub">Authorized signatory</div>
         </div>
       </div>
@@ -372,8 +372,9 @@ const PODocument = ({ id, copyType, isReceiver, partyName, items, poNumber, poDa
    Main Page
    ══════════════════════════════════════════════════════════════ */
 const PurchaseOrder = () => {
-  const { companySettings, fetchCompanySettings } = useCompanyStore();
+  const { companies, companySettings, fetchCompanySettings } = useCompanyStore();
   const { selectedShop } = useShopStore();
+  const [selectedCompanyId, setSelectedCompanyId] = useState("none");
   const [approvedItems, setApprovedItems] = useState([]);
   const [vendorsList, setVendorsList] = useState([]);
   const [activeParty, setActiveParty] = useState("");
@@ -455,6 +456,39 @@ const PurchaseOrder = () => {
       })
       .filter(row => row.orderQty > 0);
   }, [filteredApprovedItems, activeParty]);
+
+  // Reactively auto-select company based on selected vendor (activeParty) and their items
+  useEffect(() => {
+    if (!activeParty || itemsForActiveParty.length === 0) {
+      setSelectedCompanyId("none");
+      return;
+    }
+
+    const shopName = (itemsForActiveParty[0]?.shopName || itemsForActiveParty[0]?.shop_name || "").trim().toLowerCase();
+    if (!shopName) {
+      setSelectedCompanyId("none");
+      return;
+    }
+
+    // Search for a company whose name matches the shop name (case-insensitive fuzzy match)
+    const matched = companies.find(c => {
+      const companyName = (c.name || "").toLowerCase();
+      return companyName.includes(shopName) || shopName.includes(companyName);
+    });
+
+    if (matched) {
+      setSelectedCompanyId(matched.id);
+    } else {
+      setSelectedCompanyId("none");
+    }
+  }, [activeParty, itemsForActiveParty, companies]);
+
+  const activeCompany = useMemo(() => {
+    if (selectedCompanyId === "none" || !selectedCompanyId) {
+      return null;
+    }
+    return companies.find(c => c.id === selectedCompanyId) || null;
+  }, [selectedCompanyId, companies]);
 
   const handleDownloadPDF = async () => {
     if (isSubmittingRef.current || isUploading) return;
@@ -643,7 +677,7 @@ const PurchaseOrder = () => {
             activeParty,
             nextPoNumber,
             confirmLink,
-            companySettings?.name || COMPANY.name,
+            activeCompany?.name || COMPANY.name,
             totalOrderQty,
             traderUrl
           ).then(res => ({ role: "Trader", success: res.success, error: res.error }))
@@ -662,7 +696,7 @@ const PurchaseOrder = () => {
             formattedPhone,
             nextPoNumber,
             confirmLink,
-            companySettings?.name || COMPANY.name,
+            activeCompany?.name || COMPANY.name,
             activeParty,
             traderUrl
           ).then(res => ({ role: "Transporter", success: res.success, error: res.error }))
@@ -803,7 +837,7 @@ const PurchaseOrder = () => {
     <div className="po-page">
 
       {/* Top bar */}
-      <div className="po-topbar">
+      <div className="po-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div className="po-topbar-left">
           <h1>Purchase Orders</h1>
           <p>Select a vendor to view or print their Purchase Order</p>
@@ -813,6 +847,7 @@ const PurchaseOrder = () => {
             className="po-btn-secondary" 
             onClick={handleDownloadPDF} 
             disabled={!activeParty || isUploading}
+            style={{ margin: 0 }}
           >
             <Printer size={15} /> {isUploading ? "Submitting..." : "Generate & Submit PO"}
           </button>
@@ -845,8 +880,8 @@ const PurchaseOrder = () => {
             dbParties={dbParties}
             onPartyChange={setActiveParty}
             vendorDetails={activeVendorDetails}
-            companyInfo={companySettings}
-            companyTerms={companySettings?.terms || []}
+            companyInfo={activeCompany}
+            companyTerms={activeCompany?.terms || []}
             transporters={transporters}
             receivers={receivers}
             selectedTransporter={selectedTransporter}
@@ -869,8 +904,8 @@ const PurchaseOrder = () => {
               dbParties={dbParties}
               onPartyChange={setActiveParty}
               vendorDetails={activeVendorDetails}
-              companyInfo={companySettings}
-              companyTerms={companySettings?.terms || []}
+              companyInfo={activeCompany}
+              companyTerms={activeCompany?.terms || []}
               transporters={transporters}
               receivers={receivers}
               selectedTransporter={selectedTransporter}

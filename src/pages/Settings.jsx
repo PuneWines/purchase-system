@@ -9,7 +9,13 @@ import "../styles/Settings.css";
 const Settings = () => {
   const { users, fetchUsers, updateUser, createUser, deleteUser, currentUser } = useAuthStore();
   const { vendors, fetchVendors, updateVendor, createVendor, deleteVendor } = useVendorStore();
-  const { companySettings, fetchCompanySettings, updateCompanySettings } = useCompanyStore();
+  const { 
+    companies, 
+    fetchCompanySettings, 
+    createCompany, 
+    updateCompany, 
+    deleteCompany 
+  } = useCompanyStore();
   
   const [activeTab, setActiveTab] = useState("users");
   const [availableParties, setAvailableParties] = useState([]);
@@ -40,6 +46,9 @@ const Settings = () => {
   });
 
   // Company Form State
+  const [showCompanyForm, setShowCompanyForm] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
+  const [isCompanySubmitting, setIsCompanySubmitting] = useState(false);
   const [companyFormData, setCompanyFormData] = useState({
     name: "",
     address: "",
@@ -48,7 +57,6 @@ const Settings = () => {
     email: "",
     terms: [],
   });
-  const [isCompanySubmitting, setIsCompanySubmitting] = useState(false);
 
   // Transporter Form State
   const [transporters, setTransporters] = useState([]);
@@ -83,18 +91,7 @@ const Settings = () => {
     if (data) setReceivers(data);
   };
 
-  useEffect(() => {
-    if (companySettings) {
-      setCompanyFormData({
-        name: companySettings.name || "",
-        address: companySettings.address || "",
-        gstin: companySettings.gstin || "",
-        contact: companySettings.contact || "",
-        email: companySettings.email || "",
-        terms: companySettings.terms || [],
-      });
-    }
-  }, [companySettings]);
+
 
   const fetchAvailableParties = async () => {
     const { data, error } = await supabase
@@ -255,16 +252,61 @@ const Settings = () => {
   };
 
   // --- COMPANY SETTINGS HANDLERS ---
+  const handleAddNewCompany = () => {
+    setEditingCompany(null);
+    setCompanyFormData({
+      name: "",
+      address: "",
+      gstin: "",
+      contact: "",
+      email: "",
+      terms: [],
+    });
+    setShowCompanyForm(true);
+  };
+
+  const handleEditCompany = (company) => {
+    setEditingCompany(company.id);
+    setCompanyFormData({
+      name: company.name || "",
+      address: company.address || "",
+      gstin: company.gstin || "",
+      contact: company.contact || "",
+      email: company.email || "",
+      terms: company.terms || [],
+    });
+    setShowCompanyForm(true);
+  };
+
   const handleCompanySubmit = async (e) => {
     e.preventDefault();
     setIsCompanySubmitting(true);
-    const res = await updateCompanySettings(companyFormData);
+    
+    let res;
+    if (editingCompany) {
+      res = await updateCompany(editingCompany, companyFormData);
+    } else {
+      res = await createCompany(companyFormData);
+    }
+    
     setIsCompanySubmitting(false);
     
     if (res.success) {
-      alert("Company settings updated successfully!");
+      alert(`Company profile ${editingCompany ? 'updated' : 'created'} successfully!`);
+      setShowCompanyForm(false);
     } else {
-      alert(`Error updating company settings: ${res.error}`);
+      alert(`Error saving company details: ${res.error}`);
+    }
+  };
+
+  const handleDeleteCompany = async (companyId) => {
+    if (window.confirm("Are you sure you want to delete this company profile? This action cannot be undone.")) {
+      const res = await deleteCompany(companyId);
+      if (res.success) {
+        alert("Company profile deleted successfully!");
+      } else {
+        alert(`Error deleting company profile: ${res.error}`);
+      }
     }
   };
 
@@ -713,115 +755,177 @@ const Settings = () => {
         {activeTab === 'company' && (
           <>
             <div className="section-header">
-              <h2>Company Profile</h2>
+              <h2>Company Profiles</h2>
+              <button className="btn-primary" onClick={handleAddNewCompany}>
+                + Add New Company
+              </button>
             </div>
             
-            <div className="user-form-container">
-              <form onSubmit={handleCompanySubmit} className="user-form">
-                <h3>Company Details</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Company Name *</label>
-                    <input
-                      type="text"
-                      value={companyFormData.name}
-                      onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
-                      required
-                      disabled={isCompanySubmitting}
-                    />
+            {showCompanyForm && (
+              <div className="user-form-container">
+                <h3>{editingCompany ? "Edit Company Details" : "Create Company Profile"}</h3>
+                <form onSubmit={handleCompanySubmit} className="user-form">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Company Name *</label>
+                      <input
+                        type="text"
+                        value={companyFormData.name}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
+                        required
+                        disabled={isCompanySubmitting}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>GSTIN *</label>
+                      <input
+                        type="text"
+                        value={companyFormData.gstin}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, gstin: e.target.value })}
+                        required
+                        disabled={isCompanySubmitting}
+                      />
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label>GSTIN *</label>
-                    <input
-                      type="text"
-                      value={companyFormData.gstin}
-                      onChange={(e) => setCompanyFormData({ ...companyFormData, gstin: e.target.value })}
-                      required
-                      disabled={isCompanySubmitting}
-                    />
-                  </div>
-                </div>
 
-                <div className="form-row">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Contact Number *</label>
+                      <input
+                        type="text"
+                        value={companyFormData.contact}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, contact: e.target.value })}
+                        required
+                        disabled={isCompanySubmitting}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Email Address *</label>
+                      <input
+                        type="email"
+                        value={companyFormData.email}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, email: e.target.value })}
+                        required
+                        disabled={isCompanySubmitting}
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group">
-                    <label>Contact Number *</label>
-                    <input
-                      type="text"
-                      value={companyFormData.contact}
-                      onChange={(e) => setCompanyFormData({ ...companyFormData, contact: e.target.value })}
+                    <label>Company Address *</label>
+                    <textarea
+                      value={companyFormData.address}
+                      onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
                       required
                       disabled={isCompanySubmitting}
+                      rows="2"
                     />
                   </div>
-                  <div className="form-group">
-                    <label>Email Address *</label>
-                    <input
-                      type="email"
-                      value={companyFormData.email}
-                      onChange={(e) => setCompanyFormData({ ...companyFormData, email: e.target.value })}
-                      required
-                      disabled={isCompanySubmitting}
-                    />
+
+                  <div className="terms-section">
+                    <div className="terms-header">
+                      <h3>Terms and Conditions</h3>
+                      <button 
+                        type="button" 
+                        className="btn-secondary btn-sm" 
+                        onClick={handleAddTerm}
+                      >
+                        <Plus size={14} /> Add Term
+                      </button>
+                    </div>
+                    
+                    {companyFormData.terms.length === 0 ? (
+                      <p className="empty-state">No terms added yet.</p>
+                    ) : (
+                      <div className="terms-list">
+                        {companyFormData.terms.map((term, index) => (
+                          <div key={index} className="term-item">
+                            <span className="term-number">{index + 1}.</span>
+                            <textarea
+                              value={term}
+                              onChange={(e) => handleTermChange(index, e.target.value)}
+                              disabled={isCompanySubmitting}
+                              rows="2"
+                            />
+                            <button
+                              type="button"
+                              className="btn-icon-danger"
+                              onClick={() => handleRemoveTerm(index)}
+                              disabled={isCompanySubmitting}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label>Company Address *</label>
-                  <textarea
-                    value={companyFormData.address}
-                    onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
-                    required
-                    disabled={isCompanySubmitting}
-                    rows="2"
-                  />
-                </div>
-
-                <div className="terms-section">
-                  <div className="terms-header">
-                    <h3>Terms and Conditions</h3>
+                  <div className="form-actions" style={{ marginTop: '2rem' }}>
+                    <button type="submit" className="btn-primary" disabled={isCompanySubmitting}>
+                      {isCompanySubmitting ? "Saving..." : "Save Profile & Terms"}
+                    </button>
                     <button 
                       type="button" 
-                      className="btn-secondary btn-sm" 
-                      onClick={handleAddTerm}
+                      className="btn-secondary" 
+                      onClick={() => setShowCompanyForm(false)}
+                      disabled={isCompanySubmitting}
                     >
-                      <Plus size={14} /> Add Term
+                      Cancel
                     </button>
                   </div>
-                  
-                  {companyFormData.terms.length === 0 ? (
-                    <p className="empty-state">No terms added yet.</p>
-                  ) : (
-                    <div className="terms-list">
-                      {companyFormData.terms.map((term, index) => (
-                        <div key={index} className="term-item">
-                          <span className="term-number">{index + 1}.</span>
-                          <textarea
-                            value={term}
-                            onChange={(e) => handleTermChange(index, e.target.value)}
-                            disabled={isCompanySubmitting}
-                            rows="2"
-                          />
-                          <button
-                            type="button"
-                            className="btn-icon-danger"
-                            onClick={() => handleRemoveTerm(index)}
-                            disabled={isCompanySubmitting}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                </form>
+              </div>
+            )}
 
-                <div className="form-actions" style={{ marginTop: '2rem' }}>
-                  <button type="submit" className="btn-primary" disabled={isCompanySubmitting}>
-                    {isCompanySubmitting ? "Saving..." : "Save Profile & Terms"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            {!showCompanyForm && (
+              <div className="users-table-container">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>Company Name</th>
+                      <th>GSTIN</th>
+                      <th>Contact</th>
+                      <th>Email</th>
+                      <th>Terms Count</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companies.map((company) => (
+                      <tr key={company.id}>
+                        <td>
+                          <strong>{company.name}</strong>
+                        </td>
+                        <td>{company.gstin}</td>
+                        <td>{company.contact}</td>
+                        <td>{company.email}</td>
+                        <td>{company.terms?.length || 0}</td>
+                        <td>
+                          <button
+                            className="btn-edit"
+                            onClick={() => handleEditCompany(company)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn-delete"
+                            onClick={() => handleDeleteCompany(company.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {companies.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: 'center' }}>No company profiles found. Click "+ Add New Company" to create one.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
 

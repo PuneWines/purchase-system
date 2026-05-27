@@ -3,20 +3,91 @@ import { supabase } from "../../utils/supabase";
 
 const useCompanyStore = create((set, get) => ({
   companySettings: null,
+  companies: [],
   loading: false,
 
-  fetchCompanySettings: async () => {
+  fetchCompanies: async () => {
     set({ loading: true });
-    const { data, error } = await supabase.from('company_settings').select('*').limit(1).single();
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('*')
+      .order('name');
+    
     if (!error && data) {
-      set({ companySettings: data });
+      set({ companies: data });
+      // If we don't have an active company selected yet, default to the first one
+      if (data.length > 0) {
+        set({ companySettings: data[0] });
+      } else {
+        set({ companySettings: null });
+      }
     }
     set({ loading: false });
   },
 
+  fetchCompanySettings: async () => {
+    // Call fetchCompanies so that both arrays and single settings are updated
+    await get().fetchCompanies();
+  },
+
+  createCompany: async (companyData) => {
+    set({ loading: true });
+    // Remove id from insertion if it is present
+    const { id, ...insertData } = companyData;
+    const { data, error } = await supabase
+      .from('company_settings')
+      .insert([insertData])
+      .select()
+      .single();
+    
+    set({ loading: false });
+    if (!error && data) {
+      await get().fetchCompanies();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  },
+
+  updateCompany: async (id, companyData) => {
+    set({ loading: true });
+    // Strip id from companyData
+    const { id: _, ...updateData } = companyData;
+    const { data, error } = await supabase
+      .from('company_settings')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    set({ loading: false });
+    if (!error && data) {
+      await get().fetchCompanies();
+      return { success: true, data };
+    }
+    return { success: false, error: error?.message };
+  },
+
+  deleteCompany: async (id) => {
+    set({ loading: true });
+    const { error } = await supabase
+      .from('company_settings')
+      .delete()
+      .eq('id', id);
+    
+    set({ loading: false });
+    if (!error) {
+      await get().fetchCompanies();
+      return { success: true };
+    }
+    return { success: false, error: error?.message };
+  },
+
   updateCompanySettings: async (settingsData) => {
-    // First, strictly check the database to see if a company profile already exists
-    // This prevents multiple inserts if local state was stale or null
+    if (settingsData.id) {
+      return get().updateCompany(settingsData.id, settingsData);
+    }
+    
+    // Strict fallback check for single profile setup
     const { data: existingData } = await supabase
       .from('company_settings')
       .select('id')
@@ -24,32 +95,9 @@ const useCompanyStore = create((set, get) => ({
       .maybeSingle();
     
     if (existingData && existingData.id) {
-      // A profile exists, STRICTLY UPDATE the existing row
-      const { data, error } = await supabase
-        .from('company_settings')
-        .update(settingsData)
-        .eq('id', existingData.id)
-        .select()
-        .single();
-        
-      if (!error && data) {
-        set({ companySettings: data });
-        return { success: true };
-      }
-      return { success: false, error: error?.message };
+      return get().updateCompany(existingData.id, settingsData);
     } else {
-      // No profile exists in the database at all, so we insert the FIRST one
-      const { data, error } = await supabase
-        .from('company_settings')
-        .insert([settingsData])
-        .select()
-        .single();
-        
-      if (!error && data) {
-        set({ companySettings: data });
-        return { success: true };
-      }
-      return { success: false, error: error?.message };
+      return get().createCompany(settingsData);
     }
   }
 }));
