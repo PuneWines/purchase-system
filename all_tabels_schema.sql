@@ -34,17 +34,19 @@ CREATE TABLE public.indent_items (
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   approval_status text DEFAULT 'pending'::text,
   unique_indent_id text,
+  is_excluded boolean NOT NULL DEFAULT false,
+  exclusion_reason text,
   CONSTRAINT indent_items_pkey PRIMARY KEY (id),
   CONSTRAINT indent_items_indent_id_fkey FOREIGN KEY (indent_id) REFERENCES public.indents(id)
 );
 CREATE TABLE public.indents (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  indent_number text,
   shop_name text NOT NULL,
   status text DEFAULT 'Pending'::text CHECK (status = ANY (ARRAY['Pending'::text, 'Approved'::text, 'Rejected'::text])),
   created_by uuid,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  indent_number text,
   CONSTRAINT indents_pkey PRIMARY KEY (id),
   CONSTRAINT indents_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );

@@ -33,6 +33,25 @@ const Approval = () => {
     }
   };
 
+  const handleIncludeExcludedItem = (itemId) => {
+    setGroupedApprovals(prev => {
+      const updated = { ...prev };
+      const currentItems = updated[selectedIndentId] || [];
+      const itemIndex = currentItems.findIndex(i => i.id === itemId);
+      if (itemIndex !== -1) {
+        const item = { ...currentItems[itemIndex] };
+        item.is_excluded = false;
+        // Automatically default restored items to approved status
+        setIndentStatuses(prevStatuses => ({
+          ...prevStatuses,
+          [itemId]: 'approved'
+        }));
+        currentItems[itemIndex] = item;
+      }
+      return updated;
+    });
+  };
+
   const handleInlineChange = (itemId, field, value) => {
     setGroupedApprovals(prev => {
       const updated = { ...prev };
@@ -137,17 +156,18 @@ const Approval = () => {
       setIsLoading(true);
       const currentItems = groupedApprovals[selectedIndentId] || [];
       
-      // Filter items that have an explicitly set status
-      const itemsToUpdate = currentItems.filter(item => indentStatuses[item.id]);
+      // Filter items to update: either they have a status set in indentStatuses, or they are no longer excluded
+      const itemsToUpdate = currentItems.filter(item => indentStatuses[item.id] || !item.is_excluded);
 
       if (itemsToUpdate.length === 0) {
         alert("No approvals or rejections selected to submit.");
+        setIsLoading(false);
         return;
       }
 
       // Batch update the items in Supabase with persistent rounding logic
       const promises = itemsToUpdate.map(item => {
-        const status = indentStatuses[item.id];
+        const status = indentStatuses[item.id] || 'pending';
         let processedBox = parseFloat(item.order_box) || 0;
         let processedQty = parseFloat(item.order_qty) || 0;
 
@@ -171,7 +191,8 @@ const Approval = () => {
             approval_status: status,
             unique_indent_id: selectedIndentId,
             order_box: processedBox,
-            order_qty: processedQty
+            order_qty: processedQty,
+            is_excluded: item.is_excluded
           })
           .eq("id", item.id);
       });
@@ -230,12 +251,14 @@ const Approval = () => {
 
   const pendingBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
     const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
-    return shopOk && items.some(item => !item.approval_status || item.approval_status === 'pending');
+    // Ignore excluded items when determining pending status
+    return shopOk && items.some(item => !item.is_excluded && (!item.approval_status || item.approval_status === 'pending'));
   });
 
   const historyBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
     const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
-    return shopOk && items.every(item => item.approval_status && item.approval_status !== 'pending');
+    // Determine history based on all active (non-excluded) items
+    return shopOk && items.filter(item => !item.is_excluded).every(item => item.approval_status && item.approval_status !== 'pending');
   });
 
   const displayedBatches = activeTab === "pending" ? pendingBatches : historyBatches;
@@ -507,7 +530,7 @@ const Approval = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedApprovals[selectedIndentId]?.map((item, index) => {
+                    {groupedApprovals[selectedIndentId]?.filter(item => !item.is_excluded).map((item, index) => {
                       const itemId = item.id || index;
                       return (
                       <tr key={itemId} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8fafc'}>
@@ -587,6 +610,85 @@ const Approval = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Excluded Items Section */}
+              {groupedApprovals[selectedIndentId]?.some(item => item.is_excluded) && (
+                <div style={{ marginTop: '32px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#dc2626' }}>
+                      Excluded Products (Negative Order in Box)
+                    </h3>
+                    <span style={{
+                      backgroundColor: '#fee2e2',
+                      color: '#dc2626',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      padding: '2px 8px',
+                      borderRadius: '9999px'
+                    }}>
+                      {groupedApprovals[selectedIndentId]?.filter(item => item.is_excluded).length} items
+                    </span>
+                  </div>
+
+                  <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #fee2e2' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#fef2f2' }}>
+                          <th style={{ ...thStyle, textAlign: 'center', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Action</th>
+                          <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Indent ID</th>
+                          <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Shop Name</th>
+                          <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Item Name</th>
+                          <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Box</th>
+                          <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Qty</th>
+                          <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Final Avg Sale</th>
+                          <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Closing Qty</th>
+                          <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>B/Cs</th>
+                          <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Mls</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupedApprovals[selectedIndentId]?.filter(item => item.is_excluded).map((item, index) => {
+                          const itemId = item.id || index;
+                          return (
+                            <tr key={itemId} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#fff5f5' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#fff5f5'}>
+                              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                <button
+                                  onClick={() => handleIncludeExcludedItem(itemId)}
+                                  style={{
+                                    backgroundColor: '#dc2626',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '6px 12px',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                >
+                                  + Include
+                                </button>
+                              </td>
+                              <td style={{ ...tdStyle, color: '#991b1b' }}>{item.party_indent_id || "-"}</td>
+                              <td style={tdStyle}>{item.shop_name || "-"}</td>
+                              <td style={tdStyle}>{item.item_name}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_box || "-"}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_qty || "-"}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
+                              <td style={tdStyle}>{item.mls || "-"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
