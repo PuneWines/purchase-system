@@ -500,7 +500,7 @@ const Approval = () => {
                       <th style={thStyle}>Item Name</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Box</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Qty</th>
-                      <th style={{ ...thStyle, textAlign: 'right' }}>Avg Sale</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Final Avg Sale</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Closing Qty</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>B/Cs</th>
                       <th style={thStyle}>Mls</th>
@@ -578,7 +578,7 @@ const Approval = () => {
                             />
                           )}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>{item.fix_per_day_avg_sale || "-"}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
                         <td style={tdStyle}>{item.mls || "-"}</td>
