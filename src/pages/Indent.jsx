@@ -34,7 +34,7 @@ const Indent = () => {
           shop_name,
           status,
           created_at,
-          indent_items ( id )
+          indent_items ( id, is_excluded )
         `)
         .order('created_at', { ascending: false });
 
@@ -45,7 +45,7 @@ const Indent = () => {
 
       const historyData = (data || []).map(row => ({
         ...row,
-        itemCount: row.indent_items ? row.indent_items.length : 0
+        itemCount: row.indent_items ? row.indent_items.filter(i => !i.is_excluded).length : 0
       }));
       setSubmittedHistory(historyData);
     } catch (error) {
@@ -369,7 +369,8 @@ const Indent = () => {
         const { data, error } = await supabase
           .from('indent_items')
           .select('*')
-          .eq('indent_id', indentId);
+          .eq('indent_id', indentId)
+          .eq('is_excluded', false);
 
         if (error) throw error;
         setSubmissionItems(prev => ({ ...prev, [indentId]: data }));
@@ -506,7 +507,8 @@ const Indent = () => {
       const { data: refreshedItems } = await supabase
         .from('indent_items')
         .select('*')
-        .eq('indent_id', indentId);
+        .eq('indent_id', indentId)
+        .eq('is_excluded', false);
       setSubmissionItems(prev => ({ ...prev, [indentId]: refreshedItems || [] }));
 
       // Refresh parent history to update item counts
@@ -522,19 +524,22 @@ const Indent = () => {
   const handleIndentSubmit = async () => {
     setIsProcessing(true);
     try {
-      const validItems = [];
+      const activeItems = [];
+      const excludedItems = [];
 
       tableData.forEach((item) => {
         const calcs = calculateRow(item);
         const orderBoxVal = parseFloat(calcs.orderBox);
 
-        // Filter out orderBox values that are NaN, or <= 0.5 (including negative)
+        // Filter active orderBox values (> 0.5) and excluded negative values (< 0)
         if (!isNaN(orderBoxVal) && orderBoxVal > 0.5) {
-          validItems.push({ item, calcs });
+          activeItems.push({ item, calcs });
+        } else if (!isNaN(orderBoxVal) && orderBoxVal < 0) {
+          excludedItems.push({ item, calcs });
         }
       });
 
-      if (validItems.length === 0) {
+      if (activeItems.length === 0) {
         addToast("No valid data to submit. Only items with 'Order in Box' > 0.5 are allowed.", "error");
         setIsProcessing(false);
         return;
@@ -584,7 +589,8 @@ const Indent = () => {
       const partyMap = new Map();
       const itemsPayload = [];
 
-      validItems.forEach(({ item, calcs }) => {
+      // Add active items to payload
+      activeItems.forEach(({ item, calcs }) => {
         const partyName = item.partyName || 'UNKNOWN';
         if (!partyMap.has(partyName)) {
           partyMap.set(partyName, { index: nextPartyIndex++, count: 1 });
@@ -612,6 +618,42 @@ const Indent = () => {
           closing_qty_box: parseFloat(calcs.boxClosingQty) || 0,
           order_box: parseFloat(calcs.orderBox) || 0,
           order_qty: parseFloat(calcs.orderQty) || 0,
+          is_excluded: false,
+          exclusion_reason: null
+        });
+      });
+
+      // Add excluded items to payload
+      excludedItems.forEach(({ item, calcs }) => {
+        const partyName = item.partyName || 'UNKNOWN';
+        if (!partyMap.has(partyName)) {
+          partyMap.set(partyName, { index: nextPartyIndex++, count: 1 });
+        }
+        const partyInfo = partyMap.get(partyName);
+        const currentCount = partyInfo.count++;
+        const partyIndentId = `IN-${partyInfo.index}-${currentCount.toString().padStart(2, '0')}`;
+
+        itemsPayload.push({
+          indent_id: indentId,
+          party_indent_id: partyIndentId,
+          item_name: item.itemName,
+          fix_per_day_avg_sale: item.avgSale,
+          qty_out: item.qtyOut,
+          closing_qty: item.closingQty,
+          brand_name: item.brandName,
+          bcs: item.bcs,
+          mls: item.mls,
+          liquor_type: item.liquorType,
+          party_name: item.partyName,
+          last_month_sale_box: parseFloat(calcs.lastMonthSale) || 0,
+          per_day_sale_last_month: parseFloat(calcs.perDaySaleLastMonth) || 0,
+          final_avg_sale: parseFloat(calcs.finalAvgSale) || 0,
+          threshold_sale: parseFloat(calcs.thresholdSale) || 0,
+          closing_qty_box: parseFloat(calcs.boxClosingQty) || 0,
+          order_box: parseFloat(calcs.orderBox) || 0,
+          order_qty: parseFloat(calcs.orderQty) || 0,
+          is_excluded: true,
+          exclusion_reason: "negative_order_in_box"
         });
       });
 
