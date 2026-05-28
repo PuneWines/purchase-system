@@ -393,3 +393,221 @@
 .indent-table-row:hover td {
   background-color: #f1f5f9 !important;
 }
+
+/* Cards Grid for side-by-side layout */
+.cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 992px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Excel Upload Zone */
+.upload-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 0.375rem;
+  padding: 1.25rem;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 85px;
+}
+
+.upload-zone:hover {
+  border-color: #4f46e5;
+  background-color: #f5f3ff; /* gentle light-indigo tint */
+}
+
+.upload-zone-active {
+  border-color: #10b981;
+  background-color: #ecfdf5;
+}
+
+.upload-zone-text {
+  font-size: 0.875rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.upload-zone-subtext {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.upload-zone-icon {
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.upload-zone:hover .upload-zone-icon {
+  color: #4f46e5;
+}
+
+.excel-btn-container {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* Preview Actions and Summary Alert */
+.preview-summary-alert {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #4f46e5;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.preview-summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.preview-stat-item {
+  font-size: 0.875rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+.preview-stat-number {
+  font-weight: 700;
+}
+
+.preview-stat-number.added {
+  color: #10b981;
+}
+
+.preview-stat-number.updated {
+  color: #3b82f6;
+}
+
+.preview-stat-number.skipped {
+  color: #f59e0b;
+}
+
+.preview-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background-color: #ffffff;
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover {
+  background-color: #f8fafc;
+  color: #1e293b;
+  border-color: #94a3b8;
+}
+
+.btn-success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background-color: #10b981;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-success:hover {
+  background-color: #059669;
+}
+
+.btn-success:disabled, .btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-new {
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-update {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-error {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.preview-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.preview-table-header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.spinner-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
