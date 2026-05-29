@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import * as XLSX from 'xlsx';
-import { Upload, Settings2, Loader2, List, Clock, CheckCircle, Send, ChevronDown, ChevronRight, Package, Trash2 } from "lucide-react";
+import { Upload, Settings2, Loader2, List, Clock, CheckCircle, Send, ChevronDown, ChevronRight, Package, Trash2, AlertTriangle } from "lucide-react";
 import "../styles/Pages.css";
 
 import Toast, { useToast } from "../components/Toast";
@@ -23,6 +23,12 @@ const Indent = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [expandedSubmissions, setExpandedSubmissions] = useState({});
   const [submissionItems, setSubmissionItems] = useState({});
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
 
   const fetchSubmittedHistory = async () => {
     setIsLoadingHistory(true);
@@ -381,9 +387,17 @@ const Indent = () => {
     }
   };
 
-  const handleDeleteIndent = async (indentId) => {
-    if (!window.confirm("Are you sure you want to delete this entire indent?\n\nThis action will permanently delete all records of this indent and its items across all steps.\n\nAffected Tables:\n1. indents\n2. indent_items\n3. purchase_orders")) return;
+  const handleDeleteIndent = (indentId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Entire Indent?",
+      message: "Are you sure you want to delete this entire indent? This action will permanently delete all records of this indent and its items across all pipeline steps.",
+      onConfirm: () => performDeleteIndent(indentId)
+    });
+  };
 
+  const performDeleteIndent = async (indentId) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
       // 1. Fetch approved indent items to identify any generated purchase orders
@@ -429,9 +443,17 @@ const Indent = () => {
     }
   };
 
-  const handleDeleteItem = async (itemId, indentId) => {
-    if (!window.confirm("Are you sure you want to delete this specific item?\n\nThis action will delete the item from this indent and update or delete any associated Purchase Order.\n\nAffected Tables:\n1. indent_items\n2. purchase_orders")) return;
+  const handleDeleteItem = (itemId, indentId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Specific Item?",
+      message: "Are you sure you want to delete this specific item? This action will permanently remove the item from this indent and update or delete any associated Purchase Order.",
+      onConfirm: () => performDeleteItem(itemId, indentId)
+    });
+  };
 
+  const performDeleteItem = async (itemId, indentId) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
       // 1. Fetch the item details
@@ -1477,6 +1499,131 @@ const Indent = () => {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.4)', // Soft slate backdrop overlay
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10000,
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '30px',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '440px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+            margin: '20px'
+          }}>
+            {/* Warning Icon Container */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              color: '#ef4444',
+              marginBottom: '20px'
+            }}>
+              <AlertTriangle size={28} />
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              margin: '0 0 10px 0',
+              fontSize: '20px',
+              fontWeight: '700',
+              color: '#0f172a',
+              letterSpacing: '-0.01em'
+            }}>
+              {confirmModal.title}
+            </h3>
+
+            {/* Message */}
+            <p style={{
+              margin: '0 0 24px 0',
+              color: '#64748b',
+              fontSize: '14px',
+              lineHeight: '1.6',
+              fontWeight: '400'
+            }}>
+              {confirmModal.message}
+            </p>
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              width: '100%',
+              gap: '12px'
+            }}>
+              <button
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#f8fafc',
+                  color: '#475569',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  outline: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f1f5f9';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.color = '#475569';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  outline: 'none',
+                  boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#b91c1c';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#dc2626';
+                }}
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
