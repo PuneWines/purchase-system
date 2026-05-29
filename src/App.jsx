@@ -49,24 +49,38 @@ const AppContent = () => {
   return (
     <div className="app-layout">
       {showSidebar && <Sidebar />}
-      <main className={`main-content ${!showSidebar ? 'full-width' : ''}`}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
-          <Route path="/transporter-confirmation/:id" element={<TransporterConfirmation />} />
-          <Route path="/receiver-confirmation/:id" element={<ReceiverConfirmation />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />
-          <Route path="/approval" element={<ProtectedRoute><Approval /></ProtectedRoute>} />
-          <Route path="/po" element={<ProtectedRoute><PurchaseOrder /></ProtectedRoute>} />
-          <Route path="/trader_verification" element={<ProtectedRoute><TraderVerification /></ProtectedRoute>} />
-          <Route path="/transporter_verification" element={<ProtectedRoute><TransporterVerification /></ProtectedRoute>} />
-          <Route path="/receiving" element={<ProtectedRoute><Receiving /></ProtectedRoute>} />
-          <Route path="/master_item" element={<ProtectedRoute><MasterItem /></ProtectedRoute>} />
-          <Route path="/setting" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+      <main className={`main-content ${!showSidebar ? 'full-width' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1 }}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
+            <Route path="/transporter-confirmation/:id" element={<TransporterConfirmation />} />
+            <Route path="/receiver-confirmation/:id" element={<ReceiverConfirmation />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />
+            <Route path="/approval" element={<ProtectedRoute><Approval /></ProtectedRoute>} />
+            <Route path="/po" element={<ProtectedRoute><PurchaseOrder /></ProtectedRoute>} />
+            <Route path="/trader_verification" element={<ProtectedRoute><TraderVerification /></ProtectedRoute>} />
+            <Route path="/transporter_verification" element={<ProtectedRoute><TransporterVerification /></ProtectedRoute>} />
+            <Route path="/receiving" element={<ProtectedRoute><Receiving /></ProtectedRoute>} />
+            <Route path="/master_item" element={<ProtectedRoute><MasterItem /></ProtectedRoute>} />
+            <Route path="/setting" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+        <footer style={{
+          padding: '16px',
+          textAlign: 'center',
+          fontSize: '13px',
+          color: '#64748b',
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff',
+          fontWeight: '500',
+          zIndex: 10
+        }}>
+          Powered by <a href="https://www.botivate.in/" target="_blank" rel="noopener noreferrer" style={{ color: '#4f46e5', fontWeight: '700', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = '#4338ca'} onMouseLeave={(e) => e.currentTarget.style.color = '#4f46e5'}>Botivate</a>
+        </footer>
       </main>
       <Toast toasts={toasts} removeToast={removeToast} />
     </div>

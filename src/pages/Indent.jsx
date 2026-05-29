@@ -1,10 +1,172 @@
 import React, { useState, useRef, useEffect } from "react";
 import * as XLSX from 'xlsx';
-import { Upload, Settings2, Loader2, List, Clock, CheckCircle, Send, ChevronDown, ChevronRight, Package, Trash2, AlertTriangle } from "lucide-react";
+import { Upload, Settings2, Loader2, List, Clock, CheckCircle, Send, ChevronDown, Package, Trash2, AlertTriangle, X, TrendingUp, TrendingDown, Database, RefreshCw, Eye, Filter, Search } from "lucide-react";
 import "../styles/Pages.css";
 
 import Toast, { useToast } from "../components/Toast";
 import { supabase } from "../../utils/supabase";
+
+// Accordion row for mobile view — must be a separate component so useState is not called inside .map()
+const AccordionItem = ({ item, calcs, handleInlineChange }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-3 flex justify-between items-center hover:bg-[#f8fafc] transition-colors"
+      >
+        <div className="text-left">
+          <p className="font-semibold text-[#0f172a] text-sm">{item.itemName}</p>
+          <p className="text-[10px] text-[#64748b]">{item.brandName}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-[#4338ca]">{calcs.orderBox} boxes</span>
+          <ChevronDown size={14} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="p-3 border-t border-[#e2e8f0] bg-[#faf9ff] space-y-2">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-[#64748b] block">Qty Out:</span>
+              <span className="font-semibold text-[#0f172a]">{item.qtyOut !== null ? item.qtyOut : "—"}</span>
+            </div>
+            <div>
+              <span className="text-[#64748b] block">Closing Qty:</span>
+              <span className="font-semibold text-[#0f172a]">{item.closingQty !== null ? item.closingQty : "—"}</span>
+            </div>
+            <div className="col-span-2">
+              <span className="text-[#64748b] block">B/Cs:</span>
+              <span className="font-semibold text-[#0f172a]">{item.bcs !== null ? item.bcs : "—"}</span>
+            </div>
+            <div className="col-span-2 mt-1">
+              <span className="text-[#64748b] block">Order Qty (Editable):</span>
+              <input
+                type="number"
+                value={calcs.orderQty}
+                onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
+                className="w-full mt-1 px-2 py-1 border rounded font-semibold text-[#4338ca] text-xs bg-white"
+                placeholder="-"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Stat Pill Component
+const StatPill = ({ label, value, icon: Icon, color }) => (
+  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${color} bg-white shadow-sm`}>
+    <Icon size={14} />
+    <span className="text-xs font-medium">{label}</span>
+    <span className="text-xs font-bold">{value}</span>
+  </div>
+);
+
+// View Modal Component
+const SubmissionViewModal = ({ isOpen, onClose, submission, items, onDeleteItem, onRefresh }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  if (!isOpen) return null;
+
+  const filteredItems = items.filter(item =>
+    item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.party_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 bg-[#0f172a]/60 backdrop-blur-sm flex justify-center items-center z-[10000] p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-[#e2e8f0]">
+          <div>
+            <h2 className="text-xl font-bold text-[#0f172a]">{submission?.shop_name}</h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs text-[#64748b] flex items-center gap-1">
+                <Clock size={12} />
+                {new Date(submission?.created_at).toLocaleString()}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${submission?.status === 'Pending' ? 'bg-[#fef3c7] text-[#d97706]' : 'bg-[#dcfce7] text-[#16a34a]'
+                }`}>
+                {submission?.status === 'Pending' ? <Clock size={10} /> : <CheckCircle size={10} />}
+                {submission?.status}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-[#f1f5f9] rounded-lg transition-colors">
+            <X size={20} className="text-[#64748b]" />
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="p-4 border-b border-[#e2e8f0]">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
+            <input
+              type="text"
+              placeholder="Search items by name or party..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-[#e2e8f0] rounded-lg text-sm outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5]"
+            />
+          </div>
+        </div>
+
+        {/* Items Table */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-[#e2e8f0]">
+                <th className="text-left py-2 px-3 text-xs font-semibold text-[#64748b]">Item Name</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold text-[#64748b]">Party Name</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-[#64748b]">Order Box</th>
+                <th className="text-right py-2 px-3 text-xs font-semibold text-[#64748b]">Order Qty</th>
+                <th className="text-center py-2 px-3 text-xs font-semibold text-[#64748b]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.map((item) => (
+                <tr key={item.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                  <td className="py-2 px-3 text-[#0f172a] font-medium">{item.item_name}</td>
+                  <td className="py-2 px-3 text-[#64748b] text-sm">{item.party_name || "-"}</td>
+                  <td className="py-2 px-3 text-right font-bold text-[#4338ca]">{item.order_box}</td>
+                  <td className="py-2 px-3 text-right font-bold text-[#4338ca]">{item.order_qty}</td>
+                  <td className="py-2 px-3 text-center">
+                    <button
+                      onClick={() => onDeleteItem(item.id, submission.id)}
+                      className="p-1 text-[#ef4444] hover:bg-[#fee2e2] rounded transition-colors"
+                      title="Delete item"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredItems.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="py-8 text-center text-[#94a3b8]">No items found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-[#e2e8f0] flex justify-between items-center">
+          <span className="text-xs text-[#64748b]">{items.length} items total</span>
+          <button
+            onClick={onRefresh}
+            className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm font-medium hover:bg-[#4338ca] transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Indent = () => {
   const [tableData, setTableData] = useState(() => {
@@ -21,7 +183,6 @@ const Indent = () => {
   const { toasts, addToast, removeToast } = useToast();
   const [submittedHistory, setSubmittedHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [expandedSubmissions, setExpandedSubmissions] = useState({});
   const [submissionItems, setSubmissionItems] = useState({});
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -29,6 +190,20 @@ const Indent = () => {
     message: "",
     onConfirm: null,
   });
+  const [mobileView, setMobileView] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [selectedSubmissionItems, setSelectedSubmissionItems] = useState([]);
+
+  // Check for mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setMobileView(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const fetchSubmittedHistory = async () => {
     setIsLoadingHistory(true);
@@ -51,7 +226,8 @@ const Indent = () => {
 
       const historyData = (data || []).map(row => ({
         ...row,
-        itemCount: row.indent_items ? row.indent_items.filter(i => !i.is_excluded).length : 0
+        itemCount: row.indent_items ? row.indent_items.filter(i => !i.is_excluded).length : 0,
+        excludedCount: row.indent_items ? row.indent_items.filter(i => i.is_excluded).length : 0
       }));
       setSubmittedHistory(historyData);
     } catch (error) {
@@ -135,12 +311,25 @@ const Indent = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedShop, setSelectedShop] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadStep, setUploadStep] = useState(1); // 1: Select Shop, 2: Upload File
 
   const shops = ["FRIENDS", "VISHAL", "MADHURA", "KUNAL", "BALAJI"];
-
   const fileInputRef = useRef(null);
+
+  // Calculate statistics
+  const getStatistics = () => {
+    const totalItems = tableData.length;
+    const activeItems = tableData.filter(item => {
+      const calcs = calculateRow(item);
+      return parseFloat(calcs.orderBox) >= 0.1;
+    }).length;
+    const excludedItems = tableData.filter(item => {
+      const calcs = calculateRow(item);
+      return parseFloat(calcs.orderBox) < 0;
+    }).length;
+    return { totalItems, activeItems, excludedItems };
+  };
 
   // ── Shared row processing: takes a 2D array of strings (rows × cols) ──
   const processRows = (allRows) => {
@@ -150,7 +339,6 @@ const Indent = () => {
     let headerRowIdx = -1;
     let headers = [];
 
-    // Find real header row (scan first 15 rows)
     for (let i = 0; i < Math.min(15, allRows.length); i++) {
       const row = allRows[i].map(c => String(c ?? '').toLowerCase().trim());
       if (row.some(h => knownKeywords.some(k => h.includes(k)))) {
@@ -164,77 +352,71 @@ const Indent = () => {
       headers = allRows[0].map(c => String(c ?? '').toLowerCase().trim());
     }
 
-    console.log('[File Debug] Headers found:', headers);
-    console.log('[File Debug] Header row index:', headerRowIdx);
-
-    // Exact match first, then partial
     const getIndex = (exact, partial) => {
       let idx = headers.findIndex(h => exact.some(p => h === p));
       if (idx !== -1) return idx;
       return headers.findIndex(h => partial.some(p => h.includes(p)));
     };
 
-    // Column letters from user spec: E=4, G=6, J=9, L=11 (0-indexed)
     const partyNameIdx = getIndex(['party name'], ['party name', 'party', 'shop', 'store']);
     const itemNameIdx = getIndex(['item name'], ['item name', 'item', 'product', 'particulars', 'description']);
     const brandNameIdx = getIndex(['brand name'], ['brand name', 'brand']);
     const mlsIdx = getIndex(['size (mls)', 'size (mis)', 'size(mls)', 'size(mis)', 'size (ml)', 'size(ml)', 'mls', 'ml', 'size', 'volume'], ['size (ml)', 'size(ml)', 'size (mls)', 'size (mis)', 'mls', 'ml', 'volume']);
     const liquorTypeIdx = getIndex(['liquor type'], ['liquor type', 'liquor', 'type', 'category']);
-    // 'qty out' / 'quantity out' only — NOT 'sale' to avoid matching avg-sale columns
     const qtyOutIdx = getIndex(['quantity out', 'qty out', 'qty out (bottles)'], ['quantity out', 'qty out', 'opening stock']);
-    // closing stock in BOTTLE (not box) — prioritise 'bottle' over generic 'closing'
     const closingQtyIdx = getIndex(['closing stock in bottle', 'closing qty', 'closing quantity', 'closing stock (bottles)'],
       ['closing stock in bottle', 'closing qty', 'closing', 'balance']);
-    // bpc = bottles per case; also b/cs, bcs
     const bcsIdx = getIndex(['bpc', 'b/cs', 'bcs', 'bottles per case', 'pack size'], ['bpc', 'b/cs', 'bcs', 'b cs', 'bottles per case', 'per case', 'pack size']);
 
-    // Hard fallbacks to exact column positions if no header matched
     const fPartyName = partyNameIdx !== -1 ? partyNameIdx : (headers.length > 4 ? 4 : -1);
-    // prefer item name (full) for matching; fall back to brand name, then col G=6
     const fItemName = itemNameIdx !== -1 ? itemNameIdx : (brandNameIdx !== -1 ? brandNameIdx : (headers.length > 6 ? 6 : 0));
     const fBrandName = brandNameIdx !== -1 ? brandNameIdx : fItemName;
     const fMls = mlsIdx !== -1 ? mlsIdx : (headers.length > 9 ? 9 : -1);
     const fLiquorType = liquorTypeIdx !== -1 ? liquorTypeIdx : (headers.length > 11 ? 11 : -1);
 
-    console.log('[File Debug] Cols → partyName:', fPartyName, 'itemName:', fItemName, 'brandName:', fBrandName, 'mls:', fMls, 'liquorType:', fLiquorType, 'qtyOut:', qtyOutIdx, 'closingQty:', closingQtyIdx, 'bcs:', bcsIdx);
-
     const records = [];
     for (let i = headerRowIdx + 1; i < allRows.length; i++) {
       const row = allRows[i].map(c => String(c ?? '').trim());
-      // Use item name as the primary key for matching; fall back to brand name
       const itemVal = fItemName !== -1 ? row[fItemName] : '';
       const brandVal = fBrandName !== -1 ? row[fBrandName] : '';
       if (!itemVal && !brandVal) continue;
 
       records.push({
-        itemName: itemVal || brandVal,   // full item name used for master-data matching
-        brandName: brandVal || itemVal,    // brand name shown in Brand Name column
+        itemName: itemVal || brandVal,
+        brandName: brandVal || itemVal,
         partyName: fPartyName !== -1 ? (row[fPartyName] || '') : '',
         mls: fMls !== -1 ? (row[fMls] || '') : '',
         liquorType: fLiquorType !== -1 ? (row[fLiquorType] || '') : '',
         qtyOut: qtyOutIdx !== -1 && row[qtyOutIdx] ? parseFloat(row[qtyOutIdx]) : null,
-        closingQty: closingQtyIdx !== -1 && row[closingQtyIdx] ? parseFloat(row[closingQtyIdx]) : null,
+        closingQty: (() => {
+          if (closingQtyIdx === -1 || !row[closingQtyIdx]) return null;
+          const parsed = parseFloat(row[closingQtyIdx]);
+          if (isNaN(parsed)) return null;
+          return parsed < 0 ? 0 : parsed;
+        })(),
         bcs: bcsIdx !== -1 && row[bcsIdx] ? parseFloat(row[bcsIdx]) : null,
       });
     }
-
-    console.log('[File Debug] Records parsed:', records.length, records[0] ?? '(none)');
 
     setTableData(() => {
       const matchedRecords = [];
       const shopKey = (selectedShop || "").trim().toLowerCase();
 
-      records.forEach((record, idx) => {
-        // Find match in master data to get avgSale, filtering by BOTH selected shop and item name
-        const masterMatch = masterItemsList.find(
-          m => m.shopId === shopKey && m.itemName.toLowerCase() === record.itemName.toLowerCase()
-        );
+      // Create an O(1) lookup Map for high-speed master database referencing
+      const masterMatchMap = new Map();
+      masterItemsList.forEach(m => {
+        if (m.shopId === shopKey) {
+          masterMatchMap.set(m.itemName.toLowerCase(), m);
+        }
+      });
 
-        // ONLY include/show if there is a match in the masterItem table for the selected shop!
+      records.forEach((record, idx) => {
+        const masterMatch = masterMatchMap.get(record.itemName.toLowerCase());
+
         if (masterMatch) {
           matchedRecords.push({
             id: Date.now() + idx,
-            itemName: masterMatch.itemName, // use item name from masterItem for exact match
+            itemName: masterMatch.itemName,
             avgSale: masterMatch.avgSale,
             qtyOut: record.qtyOut,
             closingQty: record.closingQty,
@@ -251,10 +433,10 @@ const Indent = () => {
 
     setIsProcessing(false);
     setShowModal(false);
+    setUploadStep(1);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // ── File upload handler — supports .xlsx, .xls AND .csv ──
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -262,14 +444,12 @@ const Indent = () => {
     setIsProcessing(true);
     setShowModal(false);
 
-    // Yield to browser rendering so spinner can appear
     setTimeout(() => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // Score keywords we must find in a header row
         const targetKeywords = ['party name', 'brand name', 'liquor type', 'size', 'mls', 'ml'];
 
         let bestRows = null;
@@ -279,7 +459,6 @@ const Indent = () => {
           const sheet = workbook.Sheets[sheetName];
           const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-          // Look in first 15 rows for the best header row
           for (let i = 0; i < Math.min(15, rows.length); i++) {
             const row = rows[i].map(c => String(c ?? '').toLowerCase().trim());
             const score = targetKeywords.filter(kw => row.some(h => h.includes(kw))).length;
@@ -290,7 +469,6 @@ const Indent = () => {
           }
         }
 
-        console.log('[File Debug] Best sheet score:', bestScore, '— using', bestScore > 0 ? 'matched sheet' : 'first sheet');
         processRows(bestRows ?? XLSX.utils.sheet_to_json(
           workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' }
         ));
@@ -298,7 +476,6 @@ const Indent = () => {
       reader.readAsArrayBuffer(file);
     }, 150);
   };
-
 
   const handleThresholdChange = (type, value) => {
     setThresholdDays(prev => ({ ...prev, [type]: parseFloat(value) || 0 }));
@@ -317,10 +494,7 @@ const Indent = () => {
     }));
   };
 
-
-
   const calculateRow = (row) => {
-    // Only calculate if we have numbers for the required fields
     const hasData = row.qtyOut !== null && row.bcs !== null && row.closingQty !== null && row.bcs !== 0;
 
     let lastMonthSale = 0;
@@ -332,7 +506,6 @@ const Indent = () => {
     let orderQty = 0;
 
     if (hasData) {
-      // Helper to parse overrides safely and cascade them downstream
       const getActive = (val, calculated) => {
         if (val !== undefined && val !== null && val !== "") {
           const num = parseFloat(val);
@@ -366,24 +539,20 @@ const Indent = () => {
     };
   };
 
-  const toggleSubmission = async (indentId) => {
-    const isExpanding = !expandedSubmissions[indentId];
-    setExpandedSubmissions(prev => ({ ...prev, [indentId]: isExpanding }));
+  const handleViewSubmission = async (history) => {
+    setSelectedSubmission(history);
+    try {
+      const { data, error } = await supabase
+        .from('indent_items')
+        .select('*')
+        .eq('indent_id', history.id)
+        .eq('is_excluded', false);
 
-    if (isExpanding && !submissionItems[indentId]) {
-      try {
-        const { data, error } = await supabase
-          .from('indent_items')
-          .select('*')
-          .eq('indent_id', indentId)
-          .eq('is_excluded', false);
-
-        if (error) throw error;
-        setSubmissionItems(prev => ({ ...prev, [indentId]: data }));
-      } catch (error) {
-        console.error("Error fetching details:", error);
-        addToast("Failed to load submission details.", "error");
-      }
+      if (error) throw error;
+      setSelectedSubmissionItems(data || []);
+    } catch (error) {
+      console.error("Error fetching details:", error);
+      addToast("Failed to load submission details.", "error");
     }
   };
 
@@ -400,7 +569,6 @@ const Indent = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
-      // 1. Fetch approved indent items to identify any generated purchase orders
       const { data: items, error: itemsError } = await supabase
         .from('indent_items')
         .select('unique_indent_id')
@@ -410,7 +578,6 @@ const Indent = () => {
 
       const uniqueIndentIds = [...new Set((items || []).map(i => i.unique_indent_id).filter(Boolean))];
 
-      // 2. Delete linked purchase orders if any
       if (uniqueIndentIds.length > 0) {
         const { error: poError } = await supabase
           .from('purchase_orders')
@@ -419,14 +586,12 @@ const Indent = () => {
         if (poError) throw poError;
       }
 
-      // 3. Delete indent items
       const { error: delItemsError } = await supabase
         .from('indent_items')
         .delete()
         .eq('indent_id', indentId);
       if (delItemsError) throw delItemsError;
 
-      // 4. Delete the parent indent record
       const { error: delIndentError } = await supabase
         .from('indents')
         .delete()
@@ -435,6 +600,7 @@ const Indent = () => {
 
       addToast("Successfully deleted indent and associated pipeline records.", "success");
       fetchSubmittedHistory();
+      if (selectedSubmission?.id === indentId) setSelectedSubmission(null);
     } catch (error) {
       console.error("Error deleting indent:", error);
       addToast("Failed to delete indent: " + error.message, "error");
@@ -456,7 +622,6 @@ const Indent = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
-      // 1. Fetch the item details
       const { data: itemData, error: itemError } = await supabase
         .from('indent_items')
         .select('*')
@@ -467,7 +632,6 @@ const Indent = () => {
       const uniqueIndentId = itemData.unique_indent_id;
       const vendorName = itemData.party_name;
 
-      // 2. Update/Delete associated Purchase Order if applicable
       if (uniqueIndentId && vendorName) {
         const { data: poData, error: poError } = await supabase
           .from('purchase_orders')
@@ -478,7 +642,6 @@ const Indent = () => {
         if (!poError && poData && poData.length > 0) {
           const po = poData[0];
 
-          // Fetch other items in this indent for the same vendor/PO
           const { data: otherItems } = await supabase
             .from('indent_items')
             .select('id')
@@ -489,14 +652,12 @@ const Indent = () => {
           const remaining = (otherItems || []).filter(i => i.id !== itemId);
 
           if (remaining.length === 0) {
-            // Delete PO entirely if it is empty
             const { error: delPoError } = await supabase
               .from('purchase_orders')
               .delete()
               .eq('id', po.id);
             if (delPoError) throw delPoError;
           } else {
-            // Subtract quantities and update JSONB received_items
             const updatedReceivedItems = { ...(po.received_items || {}) };
             delete updatedReceivedItems[itemId];
 
@@ -516,7 +677,6 @@ const Indent = () => {
         }
       }
 
-      // 3. Delete the item from indent_items
       const { error: delItemError } = await supabase
         .from('indent_items')
         .delete()
@@ -525,15 +685,15 @@ const Indent = () => {
 
       addToast("Successfully deleted item from indent.", "success");
 
-      // Refresh items list for expanded view
-      const { data: refreshedItems } = await supabase
-        .from('indent_items')
-        .select('*')
-        .eq('indent_id', indentId)
-        .eq('is_excluded', false);
-      setSubmissionItems(prev => ({ ...prev, [indentId]: refreshedItems || [] }));
+      if (selectedSubmission?.id === indentId) {
+        const { data: refreshedItems } = await supabase
+          .from('indent_items')
+          .select('*')
+          .eq('indent_id', indentId)
+          .eq('is_excluded', false);
+        setSelectedSubmissionItems(refreshedItems || []);
+      }
 
-      // Refresh parent history to update item counts
       fetchSubmittedHistory();
     } catch (error) {
       console.error("Error deleting item:", error);
@@ -553,7 +713,6 @@ const Indent = () => {
         const calcs = calculateRow(item);
         const orderBoxVal = parseFloat(calcs.orderBox);
 
-        // Filter active orderBox values (>= 0.1) and excluded negative values (< 0)
         if (!isNaN(orderBoxVal) && orderBoxVal >= 0.1) {
           activeItems.push({ item, calcs });
         } else if (!isNaN(orderBoxVal) && orderBoxVal < 0) {
@@ -567,7 +726,6 @@ const Indent = () => {
         return;
       }
 
-      // 1. Fetch highest party index from Supabase
       let nextPartyIndex = 1;
       const { data: maxIdData, error: maxIdError } = await supabase
         .from("indent_items")
@@ -592,7 +750,6 @@ const Indent = () => {
         nextPartyIndex = maxIdx + 1;
       }
 
-      // 2. Insert Header record into `indents`
       const headerPayload = {
         shop_name: selectedShop || 'UNKNOWN',
         status: 'Pending'
@@ -607,11 +764,9 @@ const Indent = () => {
       if (headerError) throw headerError;
       const indentId = headerData.id;
 
-      // 3. Generate IDs and create Line Items payload
       const partyMap = new Map();
       const itemsPayload = [];
 
-      // Add active items to payload
       activeItems.forEach(({ item, calcs }) => {
         const partyName = item.partyName || 'UNKNOWN';
         if (!partyMap.has(partyName)) {
@@ -645,7 +800,6 @@ const Indent = () => {
         });
       });
 
-      // Add excluded items to payload
       excludedItems.forEach(({ item, calcs }) => {
         const partyName = item.partyName || 'UNKNOWN';
         if (!partyMap.has(partyName)) {
@@ -679,7 +833,6 @@ const Indent = () => {
         });
       });
 
-      // 4. Insert into `indent_items`
       const { error: itemsError } = await supabase
         .from("indent_items")
         .insert(itemsPayload);
@@ -687,9 +840,9 @@ const Indent = () => {
       if (itemsError) throw itemsError;
 
       addToast(`Successfully submitted ${itemsPayload.length} records to Supabase!`, "success");
-      setTableData([]); // clear CSV data
+      setTableData([]);
       sessionStorage.removeItem('indent_tableData');
-      fetchSubmittedHistory(); // Refresh history table
+      fetchSubmittedHistory();
     } catch (error) {
       console.error("Error submitting indent data:", error);
       addToast("Failed to submit data. Please check the console for details.", "error");
@@ -698,955 +851,531 @@ const Indent = () => {
     }
   };
 
-  const tableHeaderStyle = {
-    border: '1px solid #ffffff',
-    padding: '12px 14px',
-    textAlign: 'center',
-    fontWeight: '600',
-    color: '#334155', // Soft slate-700
-    fontSize: '12px',
-    letterSpacing: '0.5px',
-    textTransform: 'uppercase'
-  };
-
-  const inlineInputStyle = {
-    width: '100%',
-    minWidth: '70px',
-    padding: '10px 8px',
-    border: '1px solid transparent',
-    backgroundColor: 'transparent',
-    fontSize: '13px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'all 0.2s',
-    fontWeight: '500',
-  };
+  const stats = getStatistics();
 
   return (
-    <div className="page-container" style={{ padding: '20px', maxWidth: '100%' }}>
+    <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6">
       <Toast toasts={toasts} removeToast={removeToast} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', marginBottom: '24px', gap: '20px' }}>
 
-        {/* Title and Description */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{
-              margin: 0,
-              fontSize: '28px',
-              fontWeight: '700',
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              lineHeight: '1.2'
-            }}>
-              Indent Calculations
-            </h1>
-            {!isLoading && (
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '4px 10px',
-                backgroundColor: '#eff6ff',
-                color: '#3b82f6',
-                borderRadius: '9999px',
-                fontSize: '13px',
-                fontWeight: '600',
-                border: '1px solid #bfdbfe',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-              }}>
-                <span style={{ marginRight: '6px', fontSize: '10px' }}>●</span>
-                {tableData.length} Items
-              </div>
-            )}
-          </div>
-          <p style={{
-            margin: 0,
-            color: '#64748b',
-            fontSize: '15px',
-            fontWeight: '400',
-            letterSpacing: '0.01em'
-          }}>
+      {/* Page Shell */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-[#0f172a] to-[#1e293b] bg-clip-text text-transparent tracking-tight">
+            Indent Calculations
+          </h1>
+          <p className="text-[#64748b] text-sm mt-2">
             Upload CSV or edit cells directly to calculate indents
           </p>
         </div>
 
-        {/* Right Side Controls Group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {/* Professional Strip Format for Days Master */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            backgroundColor: '#f8fafc',
-            padding: '0 16px',
-            height: '40px',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
-              <Settings2 size={16} />
-              <span>Threshold Days:</span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {Object.entries(thresholdDays).map(([type, days]) => (
-                <div key={type} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: '#fff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  overflow: 'hidden'
-                }}>
-                  <span style={{
-                    backgroundColor: '#f1f5f9',
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: '#334155',
-                    borderRight: '1px solid #cbd5e1'
-                  }}>
-                    {type}
-                  </span>
-                  <input
-                    type="number"
-                    value={days}
-                    onChange={(e) => handleThresholdChange(type, e.target.value)}
-                    style={{
-                      width: '45px',
-                      padding: '4px',
-                      textAlign: 'center',
-                      border: 'none',
-                      outline: 'none',
-                      fontWeight: '600',
-                      color: '#0f172a',
-                      fontSize: '13px'
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
+        {/* Compact Stats Pills - Only when data exists */}
+        {tableData.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <StatPill label="Items" value={stats.totalItems} icon={Database} color="border-blue-200 text-blue-600" />
+            <StatPill label="Active" value={stats.activeItems} icon={TrendingUp} color="border-green-200 text-green-600" />
+            <StatPill label="Excluded" value={stats.excludedItems} icon={TrendingDown} color="border-red-200 text-red-600" />
+            <StatPill label="Shop" value={selectedShop || 'Not Selected'} icon={Package} color="border-purple-200 text-purple-600" />
           </div>
+        )}
 
-          {/* Divisor Selection UI */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            backgroundColor: '#f8fafc',
-            padding: '0 16px',
-            height: '40px',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontWeight: '600', fontSize: '13px' }}>
-              <Settings2 size={16} />
-              <span>Divisor:</span>
-            </div>
-            <select
-              value={daysDivisor}
-              onChange={(e) => setDaysDivisor(Number(e.target.value))}
-              style={{
-                padding: '4px 8px',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                outline: 'none',
-                fontWeight: '600',
-                color: '#0f172a',
-                fontSize: '13px',
-                cursor: 'pointer',
-                backgroundColor: '#fff'
-              }}
-            >
-              <option value={7}>7 Days</option>
-              <option value={30}>30 Days</option>
-            </select>
-          </div>
 
-          {/* Action Buttons: Upload & Submit */}
-          <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-            <div>
+
+        {/* Upload Button Area */}
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            {tableData.length > 0 && (
               <button
                 onClick={() => setShowModal(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: '#10b981',
-                  color: '#ffffff',
-                  padding: '0 16px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  border: 'none',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box',
-                  fontSize: '14px',
-                  transition: 'all 0.2s ease',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#059669'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; }}
+                className="flex items-center gap-2 bg-gradient-to-r from-[#10b981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all text-sm"
               >
-                <Upload size={18} />
+                <Upload size={16} />
                 Upload CSV
               </button>
-            </div>
+            )}
 
             {tableData.length > 0 && !tableData[0]?.partyIndentId && (
-              <div>
-                <button
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    backgroundColor: '#4f46e5',
-                    color: '#ffffff',
-                    padding: '0 16px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                    border: 'none',
-                    whiteSpace: 'nowrap',
-                    boxSizing: 'border-box',
-                    fontSize: '14px',
-                    transition: 'all 0.2s ease',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#4338ca';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#4f46e5';
-                  }}
-                  onClick={handleIndentSubmit}
-                >
-                  <Send size={18} />
-                  Submit Indent
-                </button>
-              </div>
+              <button
+                className="flex items-center gap-2 bg-gradient-to-r from-[#4f46e5] to-[#4338ca] hover:from-[#4338ca] hover:to-[#3730a3] text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all text-sm"
+                onClick={handleIndentSubmit}
+              >
+                <Send size={16} />
+                Submit Indent
+              </button>
             )}
 
             {tableData.length > 0 && (
-              <div>
-                <button
-                  onClick={() => {
-                    setTableData([]);
-                    sessionStorage.removeItem('indent_tableData');
-                    addToast("Data cleared successfully", "success");
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    padding: '0 16px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                    border: 'none',
-                    whiteSpace: 'nowrap',
-                    boxSizing: 'border-box',
-                    fontSize: '14px',
-                    flexShrink: 0,
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ef4444'; }}
-                >
-                  <Trash2 size={18} />
-                  Clear Data
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  setTableData([]);
+                  sessionStorage.removeItem('indent_tableData');
+                  addToast("Data cleared successfully", "success");
+                }}
+                className="flex items-center gap-2 bg-white border border-[#e2e8f0] hover:bg-[#fef2f2] hover:border-[#fecaca] text-[#ef4444] px-4 py-2 rounded-lg font-semibold transition-all text-sm"
+              >
+                <Trash2 size={16} />
+                Clear Data
+              </button>
             )}
           </div>
         </div>
-      </div>
 
-      {tableData.length > 0 ? (
-        <>
-          <div style={{
-            overflowX: 'auto',
-            overflowY: 'auto',
-            maxHeight: '75vh',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            backgroundColor: '#fff',
-            WebkitOverflowScrolling: 'touch',
-            scrollBehavior: 'smooth',
-            willChange: 'transform'
-          }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', whiteSpace: 'normal', tableLayout: 'auto' }}>
-              <style>
-                {`
-              .page-container div::-webkit-scrollbar {
-                height: 8px;
-                width: 8px;
-              }
-              .page-container div::-webkit-scrollbar-track {
-                background: #f1f5f9;
-                border-radius: 4px;
-              }
-              .page-container div::-webkit-scrollbar-thumb {
-                background: #cbd5e1;
-                border-radius: 4px;
-              }
-              .page-container div::-webkit-scrollbar-thumb:hover {
-                background: #94a3b8;
-              }
-            `}
-              </style>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr>
-                  <th colSpan={tableData[0]?.partyIndentId ? "3" : "2"} style={{ ...tableHeaderStyle, backgroundColor: '#cbd5e1' }}>
-                    Item Master File
-                  </th>
-                  <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#e2e8f0' }}>
-                    Excel File (Editable)
-                  </th>
-                  <th colSpan="7" style={{ ...tableHeaderStyle, backgroundColor: '#c7d2fe' }}>
-                    Calculations
-                  </th>
-                </tr>
-                <tr style={{ color: '#475569', whiteSpace: 'nowrap', fontSize: '12px' }}>
-                  {tableData[0]?.partyIndentId && (
-                    <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', backgroundColor: '#e2e8f0' }}>Indent ID</th>
-                  )}
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'left', minWidth: '220px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Item Name</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', minWidth: '100px', whiteSpace: 'normal', backgroundColor: '#e2e8f0' }}>Fix per day avg sale in box</th>
+        {/* Collapsible Settings */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center gap-2 text-sm font-semibold text-[#64748b] hover:text-[#0f172a] transition-colors"
+          >
+            <Settings2 size={16} />
+            Calculation Settings
+            <ChevronDown size={14} className={`transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`} />
+          </button>
 
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Quantity out</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Closing Qty</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Brand Name</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>B/Cs</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Mls</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9' }}>Liquor Type</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#f1f5f9', minWidth: '150px' }}>Party Name</th>
+          {showSettings && (
+            <div className="mt-4 p-4 bg-[#f8fafc] rounded-lg border border-[#e2e8f0]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {Object.entries(thresholdDays).map(([type, days]) => (
+                  <div key={type} className="bg-white border border-[#e2e8f0] rounded-lg p-2">
+                    <div className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-1">{type}</div>
+                    <input
+                      type="number"
+                      value={days}
+                      onChange={(e) => handleThresholdChange(type, e.target.value)}
+                      className="w-full text-lg font-bold text-[#0f172a] border border-[#e2e8f0] rounded px-2 py-1 outline-none focus:border-[#4f46e5] focus:ring-1 focus:ring-[#4f46e5]"
+                      style={{ MozAppearance: 'textfield' }}
+                    />
+                    <div className="text-[9px] text-[#64748b] mt-1">Days threshold</div>
+                  </div>
+                ))}
+              </div>
 
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Last Month sale in box</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Per day sale in Box </th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Final Avg Sale</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Threshold sale</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Closing qty in Box</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Box</th>
-                  <th style={{ border: '1px solid #fff', padding: '12px 8px', textAlign: 'center', backgroundColor: '#e0e7ff', whiteSpace: 'normal', minWidth: '140px' }}>Order in Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableData.map((item, index) => {
-                  const calcs = calculateRow(item);
-                  const cellStyle = { border: '1px solid #e2e8f0', borderBottom: '1px solid #cbd5e1', color: '#475569' };
-                  const rowBgColor = index % 2 === 0 ? '#ffffff' : '#f8fafc';
-                  const inputBgColor = 'transparent';
-                  const inputFocusBgColor = 'rgba(99, 102, 241, 0.05)';
-                  const calcCellBgColor = index % 2 === 0 ? '#f8faff' : '#f4f7ff'; // Very soft indigo tint for calcs
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-[#475569]">Calculation Period:</span>
+                <select
+                  value={daysDivisor}
+                  onChange={(e) => setDaysDivisor(Number(e.target.value))}
+                  className="px-3 py-1.5 border border-[#cbd5e1] rounded-md outline-none font-medium text-[#0f172a] text-xs cursor-pointer bg-white hover:border-[#4f46e5]"
+                >
+                  <option value={7}>7 Days (Weekly)</option>
+                  <option value={30}>30 Days (Monthly)</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
 
-                  return (
-                    <tr key={item.id} className="indent-table-row" style={{ backgroundColor: rowBgColor }}>
-                      {tableData[0]?.partyIndentId && (
-                        <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center', fontWeight: '600', color: '#0f172a', backgroundColor: '#f8fafc' }}>
-                          {item.partyIndentId}
-                        </td>
-                      )}
-                      <td style={{ ...cellStyle, padding: '12px 10px', fontWeight: '500', color: '#1e293b' }}>{item.itemName}</td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500' }}>{item.avgSale}</td>
-
-                      {/* Inline Editable Inputs */}
-                      <td style={{ ...cellStyle, padding: 0 }}>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.qtyOut !== null ? item.qtyOut : ""}
-                          onChange={(e) => handleInlineChange(item.id, 'qtyOut', e.target.value)}
-                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                          placeholder="-"
-                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                        />
-                      </td>
-                      <td style={{ ...cellStyle, padding: 0 }}>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.closingQty !== null ? item.closingQty : ""}
-                          onChange={(e) => handleInlineChange(item.id, 'closingQty', e.target.value)}
-                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                          placeholder="-"
-                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                        />
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', color: '#1e293b', fontWeight: '500' }}>
-                        {item.brandName || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: 0 }}>
-                        <input
-                          type="number"
-                          step="any"
-                          value={item.bcs !== null ? item.bcs : ""}
-                          onChange={(e) => handleInlineChange(item.id, 'bcs', e.target.value)}
-                          style={{ ...inlineInputStyle, textAlign: 'right', backgroundColor: inputBgColor }}
-                          placeholder="-"
-                          onFocus={(e) => e.target.style.backgroundColor = inputFocusBgColor}
-                          onBlur={(e) => e.target.style.backgroundColor = inputBgColor}
-                        />
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
-                        {item.mls || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'center' }}>
-                        {item.liquorType || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px' }}>
-                        {item.partyName || "—"}
-                      </td>
-
-                      {/* Calculation Display */}
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
-                        {calcs.lastMonthSale || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
-                        {calcs.perDaySaleLastMonth || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
-                        {calcs.finalAvgSale || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
-                        {calcs.thresholdSale || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: '12px 10px', textAlign: 'right', fontWeight: '500', color: '#4338ca', backgroundColor: calcCellBgColor }}>
-                        {calcs.boxClosingQty || "—"}
-                      </td>
-                      <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                        <input
-                          type="number"
-                          step="any"
-                          value={calcs.orderBox}
-                          onChange={(e) => handleInlineChange(item.id, 'orderBox', e.target.value)}
-                          style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
-                          placeholder="-"
-                        />
-                      </td>
-                      <td style={{ ...cellStyle, padding: 0, backgroundColor: calcCellBgColor }}>
-                        <input
-                          type="number"
-                          step="any"
-                          value={calcs.orderQty}
-                          onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
-                          style={{ ...inlineInputStyle, textAlign: 'right', fontWeight: '600', color: '#4338ca' }}
-                          placeholder="-"
-                        />
-                      </td>
+        {/* Data Table Section */}
+        {tableData.length > 0 ? (
+          <div className="animate-fade-in">
+            <div className="overflow-x-auto overflow-y-auto max-h-[65vh] rounded-lg border border-[#e2e8f0] bg-white shadow-sm">
+              {mobileView ? (
+                // Mobile Accordion View — uses AccordionItem component to avoid hooks-in-map
+                <div className="space-y-2 p-3">
+                  {tableData.map((item) => {
+                    const calcs = calculateRow(item);
+                    return (
+                      <AccordionItem
+                        key={item.id}
+                        item={item}
+                        calcs={calcs}
+                        handleInlineChange={handleInlineChange}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                // Detailed Table View - All 16 columns grouped section-wise
+                <table className="w-full border-collapse text-[11px] table-auto">
+                  <thead className="sticky top-0 z-30">
+                    <tr className="text-white text-[10px] font-bold tracking-wider uppercase">
+                      <th colSpan={tableData[0]?.partyIndentId ? "3" : "2"} className="bg-slate-600 border border-slate-700 px-3 py-1.5 text-center rounded-tl-lg">
+                        Item Master File
+                      </th>
+                      <th colSpan="7" className="bg-emerald-600 border border-emerald-700 px-3 py-1.5 text-center">
+                        Excel File Data
+                      </th>
+                      <th colSpan="7" className="bg-indigo-600 border border-indigo-700 px-3 py-1.5 text-center rounded-tr-lg">
+                        Calculations
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    <tr className="bg-slate-50 border-b border-[#e2e8f0] text-[#475569] text-left">
+                      {tableData[0]?.partyIndentId && (
+                        <th className="bg-slate-50 border border-white px-3 py-2 text-center font-semibold min-w-[80px]">Indent ID</th>
+                      )}
+                      <th className="sticky left-0 bg-slate-50 border border-white z-20 px-3 py-2 text-left font-semibold min-w-[280px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item Name</th>
+                      <th className="bg-slate-50 border border-white px-3 py-2 text-right font-semibold min-w-[120px]">Fix Avg Sale</th>
+
+                      <th className="bg-[#f0fdf4] border border-white px-3 py-2 text-right font-semibold min-w-[100px]">Qty Out</th>
+                      <th className="bg-[#f0fdf4] border border-white px-3 py-2 text-right font-semibold min-w-[100px]">Closing Qty</th>
+                      <th className="bg-[#f8fafc] border border-white px-3 py-2 font-semibold min-w-[150px]">Brand Name</th>
+                      <th className="bg-[#f0fdf4] border border-white px-3 py-2 text-right font-semibold min-w-[95px]">B/Cs</th>
+                      <th className="bg-[#f8fafc] border border-white px-3 py-2 text-center font-semibold min-w-[80px]">Mls</th>
+                      <th className="bg-[#f8fafc] border border-white px-3 py-2 text-center font-semibold min-w-[110px]">Liquor Type</th>
+                      <th className="bg-[#f8fafc] border border-white px-3 py-2 font-semibold min-w-[150px]">Party Name</th>
+
+                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Last Month</th>
+                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Per Day Sale</th>
+                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Final Avg</th>
+                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Threshold</th>
+                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Closing Box</th>
+                      <th className="bg-indigo-100 border border-white px-3 py-2 text-right font-bold text-[#4338ca] min-w-[115px]">Order In Box</th>
+                      <th className="bg-indigo-100 border border-white px-3 py-2 text-right font-bold text-[#4338ca] min-w-[115px]">Order In Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.map((item, index) => {
+                      const calcs = calculateRow(item);
+                      const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                      return (
+                        <tr key={item.id} className={`${rowBg} hover:bg-indigo-50/30 transition-colors border-b border-[#f1f5f9] text-[11px]`}>
+                          {tableData[0]?.partyIndentId && (
+                            <td className="border-r border-[#e2e8f0] px-3 py-2 text-center font-medium text-[#475569]">{item.partyIndentId}</td>
+                          )}
+                          <td className={`sticky left-0 ${rowBg} z-10 px-3 py-2 font-semibold text-[#1e293b] border-r border-[#e2e8f0] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]`}>
+                            {item.itemName}
+                          </td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-[#475569]">{item.avgSale}</td>
+
+                          {/* Excel Part - Non-editable text displays */}
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right text-[#475569] font-medium">
+                            {item.qtyOut !== null ? item.qtyOut : "—"}
+                          </td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right text-[#475569] font-medium">
+                            {item.closingQty !== null ? item.closingQty : "—"}
+                          </td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-[#475569]">{item.brandName || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right text-[#475569] font-medium">
+                            {item.bcs !== null ? item.bcs : "—"}
+                          </td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-center text-[#475569]">{item.mls || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-center text-[#475569]">{item.liquorType || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-[#475569]">{item.partyName || "—"}</td>
+
+                          {/* Calculations Display */}
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.lastMonthSale || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.perDaySaleLastMonth || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.finalAvgSale || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.thresholdSale || "—"}</td>
+                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.boxClosingQty || "—"}</td>
+
+                          {/* Non-sticky calculation editable inputs */}
+                          <td className="bg-indigo-50 hover:bg-indigo-100/90 px-1 py-1 text-right border-r border-[#cbd5e1]">
+                            <input
+                              type="number"
+                              step="any"
+                              value={calcs.orderBox}
+                              onChange={(e) => handleInlineChange(item.id, 'orderBox', e.target.value)}
+                              className="w-full text-right font-bold text-[#4338ca] px-1.5 py-1 border border-transparent hover:border-indigo-300 rounded focus:border-[#4f46e5] focus:bg-white outline-none bg-transparent transition-all"
+                              placeholder="-"
+                            />
+                          </td>
+                          <td className="bg-indigo-50 hover:bg-indigo-100/90 px-1 py-1 text-right border-l border-[#cbd5e1]">
+                            <input
+                              type="number"
+                              step="any"
+                              value={calcs.orderQty}
+                              onChange={(e) => handleInlineChange(item.id, 'orderQty', e.target.value)}
+                              className="w-full text-right font-bold text-[#4338ca] px-1.5 py-1 border border-transparent hover:border-indigo-300 rounded focus:border-[#4f46e5] focus:bg-white outline-none bg-transparent transition-all"
+                              placeholder="-"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        ) : (
+          // Compact Empty State
+          <div
+            onClick={() => {
+              if (!isLoading) setShowModal(true);
+            }}
+            className={`flex flex-col items-center justify-center py-8 px-4 bg-gradient-to-b from-[#f8fafc] to-white border-2 border-dashed border-[#cbd5e1] hover:border-[#4f46e5] rounded-lg transition-all duration-300 cursor-pointer ${isLoading ? 'cursor-default opacity-50' : 'hover:shadow-md'
+              }`}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="animate-spin w-5 h-5 text-[#4f46e5]" />
+                <p className="text-xs font-medium text-[#64748b]">Loading master database reference...</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center">
+                <div className="w-10 h-10 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center mb-2">
+                  <Upload className="w-5 h-5 text-[#4f46e5]" />
+                </div>
+                <p className="text-sm font-semibold text-[#0f172a] mb-1">No Data Available</p>
+                <p className="text-xs text-[#64748b]">Upload your Indent CSV or Excel file to get started</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Recent Submissions Section - Compact Table */}
+        <div className="mt-8 pt-6 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-[#0f172a] flex items-center gap-2">
+              <List size={18} />
+              Recent Indent Submissions
+            </h2>
+            {submittedHistory.length > 0 && (
+              <button
+                onClick={fetchSubmittedHistory}
+                className="p-1.5 hover:bg-[#f1f5f9] rounded-lg transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw size={16} className="text-[#64748b]" />
+              </button>
+            )}
           </div>
 
-        </>
-      ) : (
-        <div
-          onClick={() => {
-            if (!isLoading) setShowModal(true);
-          }}
-          onMouseEnter={(e) => {
-            if (!isLoading) {
-              e.currentTarget.style.backgroundColor = '#f1f5f9';
-              e.currentTarget.style.borderColor = '#94a3b8';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isLoading) {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-            }
-          }}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '40px 20px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '12px',
-            border: '2px dashed #cbd5e1',
-            color: '#64748b',
-            cursor: isLoading ? 'default' : 'pointer',
-            transition: 'all 0.2s ease',
-            margin: '20px 0 40px 0',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-          }}>
-          {isLoading ? (
-            <>
-              <Loader2 className="search-icon" style={{ animation: 'spin 1s linear infinite', width: '32px', height: '32px', color: '#94a3b8', marginBottom: '16px' }} />
-              <p style={{ fontSize: '16px' }}>Loading master database reference...</p>
-            </>
+          {isLoadingHistory ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="animate-spin w-6 h-6 text-[#94a3b8]" />
+            </div>
+          ) : submittedHistory.length > 0 ? (
+            <div className="overflow-x-auto rounded-lg border border-[#e2e8f0]">
+              <table className="w-full text-sm">
+                <thead className="bg-[#f8fafc] border-b border-[#e2e8f0]">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#64748b]">Shop</th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#64748b]">Date & Time</th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-[#64748b]">Items</th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-[#64748b]">Excluded</th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-[#64748b]">Status</th>
+                    <th className="text-center py-3 px-4 text-xs font-semibold text-[#64748b]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submittedHistory.map((history) => (
+                    <tr key={history.id} className="border-b border-[#f1f5f9] hover:bg-[#faf9ff] transition-colors">
+                      <td className="py-3 px-4 font-medium text-[#0f172a]">{history.shop_name}</td>
+                      <td className="py-3 px-4 text-[#64748b] text-xs">
+                        {new Date(history.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} at{' '}
+                        {new Date(history.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </td>
+                      <td className="py-3 px-4 text-center font-medium">{history.itemCount}</td>
+                      <td className="py-3 px-4 text-center text-[#ef4444]">{history.excludedCount || 0}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-[#faf9ff]">
+                          {history.status === 'Pending' ? <Clock size={10} className="text-[#d97706]" /> : <CheckCircle size={10} className="text-[#16a34a]" />}
+                          <span className={history.status === 'Pending' ? 'text-[#d97706]' : 'text-[#16a34a]'}>{history.status}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleViewSubmission(history)}
+                            className="p-1.5 text-[#4f46e5] hover:bg-[#e0e7ff] rounded-lg transition-colors"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteIndent(history.id)}
+                            className="p-1.5 text-[#ef4444] hover:bg-[#fee2e2] rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
-            <>
-              <div style={{ padding: '12px', backgroundColor: '#e2e8f0', borderRadius: '50%', marginBottom: '12px' }}>
-                <Upload style={{ width: '24px', height: '24px', color: '#475569' }} />
-              </div>
-              <p style={{ fontSize: '16px', fontWeight: '600', color: '#334155', margin: 0 }}>No Data Available</p>
-              <p style={{ fontSize: '14px', marginTop: '6px', color: '#94a3b8' }}>Click here to upload your Indent CSV file</p>
-            </>
+            <div className="py-8 text-center bg-[#f8fafc] rounded-lg border border-dashed border-[#cbd5e1]">
+              <Package size={32} className="mx-auto text-[#cbd5e1] mb-2" />
+              <p className="text-sm text-[#64748b]">No submissions found.</p>
+            </div>
           )}
+        </div>
+      </div>
+
+      {/* Upload Wizard Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-[#0f172a]/50 backdrop-blur-sm flex justify-center items-center z-[1000] p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-[#0f172a]">
+                  {uploadStep === 1 ? "Select Shop" : "Upload File"}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setSelectedShop("");
+                    setUploadStep(1);
+                  }}
+                  className="p-1 hover:bg-[#f1f5f9] rounded-lg"
+                >
+                  <X size={18} className="text-[#64748b]" />
+                </button>
+              </div>
+
+              {/* Step Indicator */}
+              <div className="flex items-center gap-2 mb-5">
+                <div className={`flex-1 h-1 rounded-full transition-all ${uploadStep >= 1 ? 'bg-[#4f46e5]' : 'bg-[#e2e8f0]'}`} />
+                <div className={`flex-1 h-1 rounded-full transition-all ${uploadStep >= 2 ? 'bg-[#4f46e5]' : 'bg-[#e2e8f0]'}`} />
+              </div>
+
+              {uploadStep === 1 ? (
+                <>
+                  <select
+                    value={selectedShop}
+                    onChange={(e) => setSelectedShop(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-[#e2e8f0] text-sm outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20 transition-all mb-4"
+                  >
+                    <option value="" disabled>Select Shop...</option>
+                    {shops.map(shop => (
+                      <option key={shop} value={shop}>{shop}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => selectedShop && setUploadStep(2)}
+                    disabled={!selectedShop}
+                    className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all ${selectedShop
+                        ? 'bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                        : 'bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed'
+                      }`}
+                  >
+                    Next: Upload File
+                  </button>
+                </>
+              ) : (
+                <>
+                  <label
+                    htmlFor="csvUploadModal"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files[0];
+                      if (file) {
+                        handleFileUpload({ target: { files: [file] } });
+                      }
+                    }}
+                    className={`flex flex-col items-center justify-center p-6 rounded-lg cursor-pointer transition-all duration-200 ${isDragging
+                        ? 'bg-[#f0fdf4] border-2 border-[#22c55e] border-dashed'
+                        : 'bg-[#f8fafc] border-2 border-dashed border-[#cbd5e1] hover:border-[#4f46e5]'
+                      }`}
+                  >
+                    <div className={`p-2 rounded-full mb-2 ${isDragging ? 'bg-[#dcfce7]' : 'bg-[#e2e8f0]'}`}>
+                      <Upload size={20} className={isDragging ? 'text-[#16a34a]' : 'text-[#64748b]'} />
+                    </div>
+                    <p className="font-medium text-[#0f172a] text-sm text-center">
+                      Click to Upload Excel / CSV
+                    </p>
+                    <p className="text-xs text-[#94a3b8] mt-1">
+                      or drag & drop file here
+                    </p>
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={handleFileUpload}
+                    ref={fileInputRef}
+                    className="hidden"
+                    id="csvUploadModal"
+                  />
+
+                  <button
+                    onClick={() => setUploadStep(1)}
+                    className="w-full mt-3 py-2 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f8fafc] transition-all"
+                  >
+                    Back to Shop Selection
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Submitted History Section */}
-      <div style={{ marginTop: '40px', marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-          <List size={20} />
-          Recent Indent Submissions
-        </h2>
-
-        {isLoadingHistory ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-            <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#94a3b8' }} />
-          </div>
-        ) : submittedHistory.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {submittedHistory.map((history) => {
-              const isExpanded = expandedSubmissions[history.id];
-              const items = submissionItems[history.id] || [];
-
-              return (
-                <div key={history.id} style={{
-                  backgroundColor: '#ffffff',
-                  border: isExpanded ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  boxShadow: isExpanded ? '0 10px 25px -5px rgba(79, 70, 229, 0.1)' : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  {/* Header Row */}
-                  <div
-                    onClick={() => toggleSubmission(history.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '16px 24px', backgroundColor: isExpanded ? '#f8fafc' : '#ffffff',
-                      cursor: 'pointer', userSelect: 'none', transition: 'background-color 0.2s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: '40px', height: '40px', borderRadius: '10px',
-                        backgroundColor: isExpanded ? '#e0e7ff' : '#f1f5f9',
-                        color: isExpanded ? '#4f46e5' : '#64748b'
-                      }}>
-                        <Package size={20} />
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#0f172a' }}>
-                          {history.shop_name}
-                        </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>
-                            {history.itemCount} items
-                          </span>
-                          <span style={{ color: '#cbd5e1' }}>•</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#94a3b8' }}>
-                            <Clock size={12} />
-                            {new Date(history.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '4px',
-                        backgroundColor: history.status === 'Pending' ? '#fef3c7' : '#dcfce7',
-                        color: history.status === 'Pending' ? '#d97706' : '#16a34a',
-                        padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600'
-                      }}>
-                        {history.status === 'Pending' ? <Clock size={12} /> : <CheckCircle size={12} />}
-                        {history.status}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteIndent(history.id);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          padding: '6px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '6px',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        title="Delete entire indent batch"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                      <div style={{ color: isExpanded ? '#4f46e5' : '#94a3b8', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease' }}>
-                        <ChevronDown size={20} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded Sub-Table */}
-                  <div style={{
-                    maxHeight: isExpanded ? '10000px' : '0',
-                    opacity: isExpanded ? 1 : 0,
-                    overflow: 'hidden',
-                    transition: 'all 0.4s ease'
-                  }}>
-                    <div style={{ borderTop: '1px solid #e2e8f0', padding: '16px' }}>
-                      {items.length === 0 ? (
-                        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Loading items...</div>
-                      ) : (
-                        <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '12px', textTransform: 'uppercase' }}>
-                                <th style={{ padding: '12px 16px' }}>Party Name</th>
-                                <th style={{ padding: '12px 16px' }}>Item Name</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Final Avg Sale</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Box</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Order Qty</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {items.map((item, idx) => (
-                                <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc', fontSize: '13px' }}>
-                                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.party_name || "-"}</td>
-                                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>{item.item_name}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#4338ca' }}>{item.order_qty || "-"}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteItem(item.id, history.id);
-                                      }}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#ef4444',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        borderRadius: '4px',
-                                        transition: 'background-color 0.2s'
-                                      }}
-                                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                      title="Delete specific product item"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-            No submissions found.
-          </div>
-        )}
-      </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '30px',
-            borderRadius: '12px',
-            width: '450px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}>
-            <h2 style={{ margin: 0, textAlign: 'center', color: '#333' }}>Select Shop</h2>
-
-            <select
-              value={selectedShop}
-              onChange={(e) => setSelectedShop(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '1px solid #ccc',
-                fontSize: '16px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="" disabled>Select Shop...</option>
-              {shops.map(shop => (
-                <option key={shop} value={shop}>{shop}</option>
-              ))}
-            </select>
-
-            {selectedShop && (
-              <div style={{ marginTop: '10px' }}>
-                <label
-                  htmlFor="csvUploadModal"
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setIsDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDragging(false);
-                    const file = e.dataTransfer.files[0];
-                    if (file) {
-                      handleFileUpload({ target: { files: [file] } });
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    padding: '24px',
-                    backgroundColor: isDragging ? '#f0fdf4' : '#f8fafc',
-                    color: isDragging ? '#15803d' : '#475569',
-                    border: isDragging ? '2px dashed #22c55e' : '2px dashed #cbd5e1',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    textAlign: 'center',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.2s ease',
-                    minHeight: '120px'
-                  }}
-                >
-                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ padding: '12px', backgroundColor: isDragging ? '#dcfce7' : '#e2e8f0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Upload size={24} color={isDragging ? '#16a34a' : '#64748b'} />
-                    </div>
-                    <span>Click to Upload Excel / CSV</span>
-                  </span>
-                  <span style={{ fontSize: '13px', fontWeight: 'normal', marginTop: '8px', color: '#94a3b8' }}>
-                    (or drag & drop file here)
-                  </span>
-                </label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  onChange={handleFileUpload}
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  id="csvUploadModal"
-                />
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                setShowModal(false);
-                setSelectedShop("");
-              }}
-              style={{
-                marginTop: '10px',
-                padding: '10px',
-                backgroundColor: 'transparent',
-                color: '#666',
-                border: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                fontSize: '14px'
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {/* Submission View Modal */}
+      {selectedSubmission && (
+        <SubmissionViewModal
+          isOpen={!!selectedSubmission}
+          onClose={() => setSelectedSubmission(null)}
+          submission={selectedSubmission}
+          items={selectedSubmissionItems}
+          onDeleteItem={handleDeleteItem}
+          onRefresh={() => handleViewSubmission(selectedSubmission)}
+        />
       )}
 
       {/* Custom Confirmation Modal */}
       {confirmModal.isOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)', // Soft slate backdrop overlay
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 10000,
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            padding: '30px',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '440px',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            boxSizing: 'border-box',
-            margin: '20px'
-          }}>
-            {/* Warning Icon Container */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              backgroundColor: '#fee2e2',
-              color: '#ef4444',
-              marginBottom: '20px'
-            }}>
-              <AlertTriangle size={28} />
+        <div className="fixed inset-0 bg-[#0f172a]/60 backdrop-blur-md flex justify-center items-center z-[10000] p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 bg-[#fee2e2] rounded-full flex items-center justify-center mx-auto mb-3">
+                <AlertTriangle size={24} className="text-[#ef4444]" />
+              </div>
+              <h3 className="text-lg font-bold text-[#0f172a] mb-2">{confirmModal.title}</h3>
+              <p className="text-[#64748b] text-sm leading-relaxed mb-5">{confirmModal.message}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 px-3 py-2 rounded-lg border border-[#e2e8f0] bg-white text-[#475569] hover:bg-[#f8fafc] font-medium text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 px-3 py-2 rounded-lg bg-[#dc2626] hover:bg-[#b91c1c] text-white font-medium text-sm shadow-md"
+                >
+                  Yes, Delete
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Title */}
-            <h3 style={{
-              margin: '0 0 10px 0',
-              fontSize: '20px',
-              fontWeight: '700',
-              color: '#0f172a',
-              letterSpacing: '-0.01em'
-            }}>
-              {confirmModal.title}
-            </h3>
-
-            {/* Message */}
-            <p style={{
-              margin: '0 0 24px 0',
-              color: '#64748b',
-              fontSize: '14px',
-              lineHeight: '1.6',
-              fontWeight: '400'
-            }}>
-              {confirmModal.message}
-            </p>
-
-            {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              width: '100%',
-              gap: '12px'
-            }}>
-              <button
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  backgroundColor: '#f8fafc',
-                  color: '#475569',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f1f5f9';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.color = '#475569';
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmModal.onConfirm}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  outline: 'none',
-                  boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.2)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#b91c1c';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#dc2626';
-                }}
-              >
-                Yes, Delete
-              </button>
+      {/* Sticky Bottom Action Bar */}
+      {tableData.length > 0 && (
+        <div className="sticky bottom-0 z-40 bg-white border-t border-[#e2e8f0] shadow-lg -mx-4 md:-mx-6 lg:-mx-8 -mb-6 mt-8">
+          <div className="px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-[#64748b]">Items: <strong className="text-[#0f172a]">{stats.totalItems}</strong></span>
+              <span className="text-sm text-[#64748b]">Active: <strong className="text-[#10b981]">{stats.activeItems}</strong></span>
+              <span className="text-sm text-[#64748b]">Excluded: <strong className="text-[#ef4444]">{stats.excludedItems}</strong></span>
             </div>
+            <button
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f46e5] to-[#4338ca] hover:from-[#4338ca] hover:to-[#3730a3] text-white px-5 py-2 rounded-lg font-semibold shadow-md transition-all text-sm"
+              onClick={handleIndentSubmit}
+            >
+              <Send size={16} />
+              Submit Indent
+            </button>
           </div>
         </div>
       )}
 
       {/* Processing Overlay */}
       {isProcessing && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.75)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          backdropFilter: 'blur(4px)'
-        }}>
-          <Loader2 style={{ animation: 'spin 1s linear infinite', width: '48px', height: '48px', color: '#10b981' }} />
-          <h2 style={{ marginTop: '20px', color: '#334155', fontWeight: 'bold' }}>Processing File Data...</h2>
-          <p style={{ color: '#64748b', fontSize: '15px' }}>Please wait while we prepare the indents.</p>
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm flex flex-col justify-center items-center z-[9999] transition-all duration-300 ease-in-out animate-fade-in">
+          <div className="bg-white rounded-xl p-6 shadow-xl text-center max-w-sm mx-4 transform scale-100 transition-transform duration-300">
+            <Loader2 className="animate-spin w-10 h-10 text-[#4f46e5] mx-auto mb-3" />
+            <h3 className="text-base font-bold text-[#0f172a] mb-1">Processing File Data...</h3>
+            <p className="text-xs text-[#64748b]">Please wait while we prepare the indents.</p>
+          </div>
         </div>
       )}
-
     </div>
   );
 };
