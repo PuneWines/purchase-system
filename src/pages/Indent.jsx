@@ -531,8 +531,8 @@ const Indent = () => {
         const calcs = calculateRow(item);
         const orderBoxVal = parseFloat(calcs.orderBox);
 
-        // Filter active orderBox values (> 0.5) and excluded negative values (< 0)
-        if (!isNaN(orderBoxVal) && orderBoxVal > 0.5) {
+        // Filter active orderBox values (>= 0.1) and excluded negative values (< 0)
+        if (!isNaN(orderBoxVal) && orderBoxVal >= 0.1) {
           activeItems.push({ item, calcs });
         } else if (!isNaN(orderBoxVal) && orderBoxVal < 0) {
           excludedItems.push({ item, calcs });
@@ -540,7 +540,7 @@ const Indent = () => {
       });
 
       if (activeItems.length === 0) {
-        addToast("No valid data to submit. Only items with 'Order in Box' > 0.5 are allowed.", "error");
+        addToast("No valid data to submit. Only items with 'Order in Box' >= 0.1 are allowed.", "error");
         setIsProcessing(false);
         return;
       }
