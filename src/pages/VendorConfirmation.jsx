@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
-import { sendTransporterConfirmationMessage, generateRoleToken } from "../services/whatsappService";
+import { sendTransporterConfirmationMessage } from "../services/whatsappService";
 import "../styles/VendorConfirmation.css";
 
 const VendorConfirmation = () => {
@@ -23,17 +23,6 @@ const VendorConfirmation = () => {
   useEffect(() => {
     const fetchPO = async () => {
       try {
-        // Validate secure one-time link token to prevent unauthorized viewing
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get("token");
-        const expectedToken = generateRoleToken(id, "vendor");
-
-        if (token !== expectedToken) {
-          setError("Invalid or expired link. Access denied.");
-          setLoading(false);
-          return;
-        }
-
         const { data, error } = await supabase
           .from("purchase_orders")
           .select("*")

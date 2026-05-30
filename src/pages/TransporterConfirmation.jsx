@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
-import { generateRoleToken } from "../services/whatsappService";
 import "../styles/VendorConfirmation.css"; // We reuse the styling as requested
 
 const TransporterConfirmation = () => {
@@ -22,17 +21,6 @@ const TransporterConfirmation = () => {
   useEffect(() => {
     const fetchPO = async () => {
       try {
-        // Validate secure one-time link token to prevent unauthorized viewing
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get("token");
-        const expectedToken = generateRoleToken(id, "transporter");
-
-        if (token !== expectedToken) {
-          setError("Invalid or expired link. Access denied.");
-          setLoading(false);
-          return;
-        }
-
         const { data, err } = await supabase
           .from("purchase_orders")
           .select("*")

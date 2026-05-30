@@ -177,8 +177,7 @@ const Indent = () => {
       return [];
     }
   });
-  const [masterItemsList, setMasterItemsList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { toasts, addToast, removeToast } = useToast();
   const [submittedHistory, setSubmittedHistory] = useState([]);
@@ -245,33 +244,6 @@ const Indent = () => {
     sessionStorage.setItem('indent_tableData', JSON.stringify(tableData));
   }, [tableData]);
 
-  React.useEffect(() => {
-    fetchMasterData();
-  }, []);
-
-  const fetchMasterData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("masterItem")
-        .select("item_name, avg_sale, shop_id");
-
-      if (error) throw error;
-
-      const rawItems = (data || []).map((item) => ({
-        itemName: (item.item_name || "").trim(),
-        avgSale: parseFloat(item.avg_sale) || 0,
-        shopId: (item.shop_id || "").trim().toLowerCase(),
-      }));
-
-      setMasterItemsList(rawItems);
-    } catch (error) {
-      console.error("Error fetching master data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const [thresholdDays, setThresholdDays] = useState(() => {
     try {
       const saved = localStorage.getItem('indent_thresholdDays');
@@ -322,11 +294,11 @@ const Indent = () => {
     const totalItems = tableData.length;
     const activeItems = tableData.filter(item => {
       const calcs = calculateRow(item);
-      return parseFloat(calcs.orderBox) >= 0.1;
+      return parseFloat(calcs.orderBox) >= 3.0;
     }).length;
     const excludedItems = tableData.filter(item => {
       const calcs = calculateRow(item);
-      return parseFloat(calcs.orderBox) < 0;
+      return parseFloat(calcs.orderBox) < 3.0;
     }).length;
     return { totalItems, activeItems, excludedItems };
   };
@@ -400,33 +372,19 @@ const Indent = () => {
 
     setTableData(() => {
       const matchedRecords = [];
-      const shopKey = (selectedShop || "").trim().toLowerCase();
-
-      // Create an O(1) lookup Map for high-speed master database referencing
-      const masterMatchMap = new Map();
-      masterItemsList.forEach(m => {
-        if (m.shopId === shopKey) {
-          masterMatchMap.set(m.itemName.toLowerCase(), m);
-        }
-      });
-
       records.forEach((record, idx) => {
-        const masterMatch = masterMatchMap.get(record.itemName.toLowerCase());
-
-        if (masterMatch) {
-          matchedRecords.push({
-            id: Date.now() + idx,
-            itemName: masterMatch.itemName,
-            avgSale: masterMatch.avgSale,
-            qtyOut: record.qtyOut,
-            closingQty: record.closingQty,
-            brandName: record.brandName,
-            bcs: record.bcs,
-            mls: record.mls,
-            liquorType: record.liquorType,
-            partyName: record.partyName || selectedShop,
-          });
-        }
+        matchedRecords.push({
+          id: Date.now() + idx,
+          itemName: record.itemName,
+          avgSale: 0,
+          qtyOut: record.qtyOut,
+          closingQty: record.closingQty,
+          brandName: record.brandName,
+          bcs: record.bcs,
+          mls: record.mls,
+          liquorType: record.liquorType,
+          partyName: record.partyName || selectedShop,
+        });
       });
       return matchedRecords;
     });
@@ -516,7 +474,7 @@ const Indent = () => {
 
       lastMonthSale = getActive(row.lastMonthSale, row.qtyOut / row.bcs);
       perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, (row.qtyOut / daysDivisor) / row.bcs);
-      finalAvgSale = getActive(row.finalAvgSale, (row.avgSale + perDaySaleLastMonth) / 2);
+      finalAvgSale = getActive(row.finalAvgSale, (perDaySaleLastMonth + lastMonthSale) / 2);
       const typeKey = (row.liquorType || "").trim().toUpperCase();
       const matchedKey = typeKey ? Object.keys(thresholdDays).find(
         key => typeKey.includes(key) || key.includes(typeKey)
@@ -713,15 +671,15 @@ const Indent = () => {
         const calcs = calculateRow(item);
         const orderBoxVal = parseFloat(calcs.orderBox);
 
-        if (!isNaN(orderBoxVal) && orderBoxVal >= 0.1) {
+        if (!isNaN(orderBoxVal) && orderBoxVal >= 3.0) {
           activeItems.push({ item, calcs });
-        } else if (!isNaN(orderBoxVal) && orderBoxVal < 0) {
+        } else if (!isNaN(orderBoxVal) && orderBoxVal < 3.0) {
           excludedItems.push({ item, calcs });
         }
       });
 
       if (activeItems.length === 0) {
-        addToast("No valid data to submit. Only items with 'Order in Box' >= 0.1 are allowed.", "error");
+        addToast("No valid data to submit. Only items with 'Order in Box' >= 3.0 are allowed.", "error");
         setIsProcessing(false);
         return;
       }
@@ -829,7 +787,7 @@ const Indent = () => {
           order_box: parseFloat(calcs.orderBox) || 0,
           order_qty: parseFloat(calcs.orderQty) || 0,
           is_excluded: true,
-          exclusion_reason: "negative_order_in_box"
+          exclusion_reason: parseFloat(calcs.orderBox) < 0 ? "negative_order_in_box" : "low_order_in_box"
         });
       });
 
@@ -989,7 +947,7 @@ const Indent = () => {
                 <table className="w-full border-collapse text-[11px] table-auto">
                   <thead className="sticky top-0 z-30">
                     <tr className="text-white text-[10px] font-bold tracking-wider uppercase">
-                      <th colSpan={tableData[0]?.partyIndentId ? "3" : "2"} className="bg-slate-600 border border-slate-700 px-3 py-1.5 text-center rounded-tl-lg">
+                      <th colSpan={tableData[0]?.partyIndentId ? "2" : "1"} className="bg-slate-600 border border-slate-700 px-3 py-1.5 text-center rounded-tl-lg">
                         Item Master File
                       </th>
                       <th colSpan="7" className="bg-emerald-600 border border-emerald-700 px-3 py-1.5 text-center">
@@ -1004,7 +962,6 @@ const Indent = () => {
                         <th className="bg-slate-50 border border-white px-3 py-2 text-center font-semibold min-w-[80px]">Indent ID</th>
                       )}
                       <th className="sticky left-0 bg-slate-50 border border-white z-20 px-3 py-2 text-left font-semibold min-w-[280px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">Item Name</th>
-                      <th className="bg-slate-50 border border-white px-3 py-2 text-right font-semibold min-w-[120px]">Fix Avg Sale</th>
 
                       <th className="bg-[#f0fdf4] border border-white px-3 py-2 text-right font-semibold min-w-[100px]">Qty Out</th>
                       <th className="bg-[#f0fdf4] border border-white px-3 py-2 text-right font-semibold min-w-[100px]">Closing Qty</th>
@@ -1035,7 +992,6 @@ const Indent = () => {
                           <td className={`sticky left-0 ${rowBg} z-10 px-3 py-2 font-semibold text-[#1e293b] border-r border-[#e2e8f0] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]`}>
                             {item.itemName}
                           </td>
-                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-[#475569]">{item.avgSale}</td>
 
                           {/* Excel Part - Non-editable text displays */}
                           <td className="border-r border-[#e2e8f0] px-3 py-2 text-right text-[#475569] font-medium">

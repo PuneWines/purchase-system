@@ -75,6 +75,31 @@ const TraderVerification = () => {
     { key: "total_order_qty", label: "Total Order Qty", sortable: true },
     { key: "total_order_box", label: "Total Order Box", sortable: true },
     {
+      key: "tp_number",
+      label: "TP Number",
+      sortable: true,
+      render: (tp) => tp || <span style={{ color: "#94a3b8" }}>—</span>
+    },
+    {
+      key: "trader_item_statuses",
+      label: "Item Approvals",
+      sortable: false,
+      render: (statuses) => {
+        if (!statuses || typeof statuses !== 'object' || Object.keys(statuses).length === 0) {
+          return <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+        const values = Object.values(statuses);
+        const approvedCount = values.filter(v => v === 'approved').length;
+        const rejectedCount = values.filter(v => v === 'rejected').length;
+        return (
+          <span style={{ fontWeight: "600", fontSize: "13px" }}>
+            {approvedCount > 0 && <span style={{ color: "#16a34a" }}>{approvedCount} ✅ </span>}
+            {rejectedCount > 0 && <span style={{ color: "#dc2626" }}>{rejectedCount} ❌</span>}
+          </span>
+        );
+      }
+    },
+    {
       key: "trader_pdf_url",
       label: "Trader PDF",
       sortable: false,

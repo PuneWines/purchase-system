@@ -2,7 +2,10 @@ import React, { useState, useEffect } from "react";
 import useAuthStore from "../store/useAuthStore";
 import useVendorStore from "../store/useVendorStore";
 import useCompanyStore from "../store/useCompanyStore";
-import { Plus, Trash2, Edit2, Shield, Settings as SettingsIcon } from "lucide-react";
+import { 
+  Plus, Trash2, Edit2, Shield, Settings as SettingsIcon,
+  Search, Copy, Check, Truck, UserCheck, Package, ShoppingBag, AlertCircle, Loader2
+} from "lucide-react";
 import { supabase } from "../../utils/supabase";
 import "../styles/Settings.css";
 
@@ -18,6 +21,7 @@ const Settings = () => {
   } = useCompanyStore();
   
   const [activeTab, setActiveTab] = useState("users");
+  const [searchQuery, setSearchQuery] = useState("");
   const [availableParties, setAvailableParties] = useState([]);
   
   // User Form State
@@ -72,6 +76,8 @@ const Settings = () => {
   const [isReceiverSubmitting, setIsReceiverSubmitting] = useState(false);
   const [receiverFormData, setReceiverFormData] = useState({ name: "", contact_number: "" });
 
+  const [vendorPortalLinks, setVendorPortalLinks] = useState({});
+
   useEffect(() => {
     fetchUsers();
     fetchVendors();
@@ -79,6 +85,7 @@ const Settings = () => {
     fetchCompanySettings();
     fetchTransporters();
     fetchReceivers();
+    fetchVendorPortalLinks();
   }, [fetchUsers, fetchVendors, fetchCompanySettings]);
 
   const fetchTransporters = async () => {
@@ -89,6 +96,25 @@ const Settings = () => {
   const fetchReceivers = async () => {
     const { data } = await supabase.from("receivers").select("*").order("created_at", { ascending: false });
     if (data) setReceivers(data);
+  };
+
+  const fetchVendorPortalLinks = async () => {
+    try {
+      const { data: pos } = await supabase
+        .from("purchase_orders")
+        .select("vendor_name, vendor_id")
+        .not("vendor_id", "is", null);
+
+      const mapping = {};
+      pos?.forEach(po => {
+        if (po.vendor_name && po.vendor_id) {
+          mapping[po.vendor_name.trim().toLowerCase()] = po.vendor_id;
+        }
+      });
+      setVendorPortalLinks(mapping);
+    } catch (err) {
+      console.error("[Settings] Error resolving vendor portal links:", err);
+    }
   };
 
 
@@ -396,702 +422,1060 @@ const Settings = () => {
     }
   };
 
+  const filteredVendors = vendors.filter(v => 
+    v.party_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (v.contact && v.contact.includes(searchQuery))
+  );
+
+  const filteredTransporters = transporters.filter(t => 
+    t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.contact_number && t.contact_number.includes(searchQuery))
+  );
+
+  const filteredReceivers = receivers.filter(r => 
+    r.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (r.contact_number && r.contact_number.includes(searchQuery))
+  );
+
   return (
-    <div className="page-container">
-      <h1>Settings</h1>
-      <p className="page-description">
-        Manage application settings, users, vendors, and company profile.
-      </p>
+    <div className="min-h-screen bg-slate-50/50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900 text-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-800 gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center gap-3">
+              <SettingsIcon className="text-indigo-400" size={32} />
+              Settings & Portal Control
+            </h1>
+            <p className="text-slate-400 text-xs md:text-sm mt-1">
+              Configure system user roles, vendors ledger, logistics partners, and manage permanent verification portal links.
+            </p>
+          </div>
+          <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
+            Admin Console
+          </span>
+        </div>
 
-      <div className="settings-tabs">
-        <button 
-          className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
-        >
-          User Management
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'vendors' ? 'active' : ''}`}
-          onClick={() => setActiveTab('vendors')}
-        >
-          Vendor Management
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'company' ? 'active' : ''}`}
-          onClick={() => setActiveTab('company')}
-        >
-          Company Profile
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'transporters' ? 'active' : ''}`}
-          onClick={() => setActiveTab('transporters')}
-        >
-          Transporters
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'receivers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('receivers')}
-        >
-          Receivers
-        </button>
-      </div>
-
-      <div className="settings-section">
-        {activeTab === 'users' && (
-          <>
-            <div className="section-header">
-              <h2>User Management</h2>
-              <button className="btn-primary" onClick={handleAddNew}>
-                + Add New User
+        {/* Tab Navigation pills */}
+        <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          {[
+            { id: "users", label: "User Management" },
+            { id: "vendors", label: "Vendor Management" },
+            { id: "company", label: "Company Profile" },
+            { id: "transporters", label: "Transporters" },
+            { id: "receivers", label: "Receivers" },
+            { id: "portal_links", label: "Secure Portal Links" }
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setSearchQuery(""); }}
+                className={`px-4 py-2.5 text-sm font-bold rounded-lg transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {tab.label}
               </button>
-            </div>
+            );
+          })}
+        </div>
 
-            {showForm && (
-              <div className="user-form-container">
-                <h3>{editingUser ? "Edit User" : "Create New User"}</h3>
-                <form onSubmit={handleSubmit} className="user-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Username *</label>
-                      <input
-                        type="text"
-                        value={formData.username}
-                        onChange={(e) =>
-                          setFormData({ ...formData, username: e.target.value })
-                        }
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Email *</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Password *</label>
-                      <input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) =>
-                          setFormData({ ...formData, password: e.target.value })
-                        }
-                        required={!editingUser}
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Role *</label>
-                      <select
-                        value={formData.role}
-                        onChange={(e) =>
-                          setFormData({ ...formData, role: e.target.value })
-                        }
-                        disabled={isSubmitting}
-                      >
-                        <option value="user">User</option>
-                        <option value="approver">Approver</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-group permissions-group">
-                    <label>Permissions</label>
-                    <div className="permissions-grid">
-                      {allPermissions.map((perm) => (
-                        <div key={perm.key} className="permission-item">
-                          <input
-                            type="checkbox"
-                            id={perm.key}
-                            checked={formData.permissions.includes(perm.key)}
-                            onChange={() => handlePermissionChange(perm.key)}
-                            disabled={isSubmitting}
-                          />
-                          <label htmlFor={perm.key}>{perm.label}</label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                      {isSubmitting ? "Saving..." : "Save User"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setShowForm(false)}
-                      disabled={isSubmitting}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+        {/* Settings Content Area */}
+        <div className="space-y-6">
+          
+          {/* USERS MANAGEMENT TAB */}
+          {activeTab === 'users' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">System Users</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Manage operator roles, credentials, and page authorizations.</p>
+                </div>
+                <button 
+                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  onClick={handleAddNew}
+                >
+                  <Plus size={15} /> Add New User
+                </button>
               </div>
-            )}
 
-            <div className="users-table-container">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Permissions Count</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td>
-                        <strong>{user.username}</strong>
-                      </td>
-                      <td>{user.email}</td>
-                      <td>
-                        <span className={`role-badge role-${user.role}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>{user.permissions?.length || 0}</td>
-                      <td>
-                        <button
-                          className="btn-edit"
-                          onClick={() => handleEdit(user)}
-                          disabled={user.id === currentUser?.id}
+              {showForm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                    {editingUser ? "📝 Edit User Profile" : "✨ Create New User Account"}
+                  </h3>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Username *</label>
+                        <input
+                          type="text"
+                          value={formData.username}
+                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                          required
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Email Address *</label>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          required
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Password {editingUser && "(Leave empty to keep current)"}</label>
+                        <input
+                          type="password"
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          required={!editingUser}
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">System Role *</label>
+                        <select
+                          value={formData.role}
+                          onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                         >
-                          Edit
-                        </button>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDelete(user.id)}
-                          disabled={user.id === currentUser?.id}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && (
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: 'center' }}>No users found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+                          <option value="user">Operator (User)</option>
+                          <option value="approver">Approver</option>
+                          <option value="admin">Administrator</option>
+                        </select>
+                      </div>
+                    </div>
 
-        {activeTab === 'vendors' && (
-          <>
-            <div className="section-header">
-              <h2>Vendor Management</h2>
-              <button className="btn-primary" onClick={handleAddNewVendor}>
-                + Add New Vendor
-              </button>
-            </div>
-
-            {showVendorForm && (
-              <div className="user-form-container">
-                <h3>{editingVendor ? "Edit Vendor" : "Create New Vendor"}</h3>
-                <form onSubmit={handleVendorSubmit} className="user-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Party Name *</label>
-                      <select
-                        value={vendorFormData.party_name}
-                        onChange={(e) =>
-                          setVendorFormData({ ...vendorFormData, party_name: e.target.value })
-                        }
-                        required
-                        disabled={isVendorSubmitting}
-                      >
-                        <option value="">Select a Party</option>
-                        {availableParties.map((party, idx) => (
-                          <option key={idx} value={party}>{party}</option>
+                    <div className="space-y-2 pt-2">
+                      <label className="text-xs font-bold text-slate-700 block">Page Authorizations / Permissions</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        {allPermissions.map((perm) => (
+                          <label key={perm.key} className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={formData.permissions.includes(perm.key)}
+                              onChange={() => handlePermissionChange(perm.key)}
+                              disabled={isSubmitting}
+                              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                            />
+                            <span className="text-xs font-semibold text-slate-700">{perm.label}</span>
+                          </label>
                         ))}
-                      </select>
+                      </div>
                     </div>
-                    <div className="form-group">
-                      <label>GSTIN</label>
-                      <input
-                        type="text"
-                        value={vendorFormData.gstin}
-                        onChange={(e) =>
-                          setVendorFormData({ ...vendorFormData, gstin: e.target.value })
-                        }
-                        disabled={isVendorSubmitting}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Contact</label>
-                      <input
-                        type="text"
-                        value={vendorFormData.contact}
-                        onChange={(e) =>
-                          setVendorFormData({ ...vendorFormData, contact: e.target.value })
-                        }
-                        disabled={isVendorSubmitting}
-                      />
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                      <button 
+                        type="submit" 
+                        disabled={isSubmitting}
+                        className="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        {isSubmitting ? "Saving..." : "Save User Details"}
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowForm(false)}
+                        className="px-5 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
                     </div>
-                    <div className="form-group">
-                      <label>Email</label>
-                      <input
-                        type="email"
-                        value={vendorFormData.email}
-                        onChange={(e) =>
-                          setVendorFormData({ ...vendorFormData, email: e.target.value })
-                        }
-                        disabled={isVendorSubmitting}
-                      />
-                    </div>
-                  </div>
+                  </form>
+                </div>
+              )}
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Contact Name</label>
+              {/* Users Ledger Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Username</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Security Role</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Auth Count</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {users.map((user) => (
+                        <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-900 font-bold">{user.username}</strong></td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{user.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              user.role === 'admin' 
+                                ? 'bg-red-50 text-red-700 border border-red-200' 
+                                : user.role === 'approver' 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                                  : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-bold">{user.permissions?.length || 0}</td>
+                          <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleEdit(user)}
+                              disabled={user.id === currentUser?.id}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleDelete(user.id)}
+                              disabled={user.id === currentUser?.id}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {users.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center text-slate-500 font-medium">No system users configured.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VENDORS TAB */}
+          {activeTab === 'vendors' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Supplier Ledger</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Register manufacturing plants, contact info, and tax credentials.</p>
+                </div>
+                <button 
+                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  onClick={handleAddNewVendor}
+                >
+                  <Plus size={15} /> Add New Vendor
+                </button>
+              </div>
+
+              {showVendorForm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                    {editingVendor ? "📝 Edit Supplier details" : "✨ Create New Supplier Entry"}
+                  </h3>
+                  <form onSubmit={handleVendorSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Party / Vendor Name *</label>
+                        <select
+                          value={vendorFormData.party_name}
+                          onChange={(e) => setVendorFormData({ ...vendorFormData, party_name: e.target.value })}
+                          required
+                          disabled={isVendorSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        >
+                          <option value="">Select a Party Name</option>
+                          {availableParties.map((party, idx) => (
+                            <option key={idx} value={party}>{party}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">GSTIN / Tax ID</label>
+                        <input
+                          type="text"
+                          value={vendorFormData.gstin}
+                          onChange={(e) => setVendorFormData({ ...vendorFormData, gstin: e.target.value })}
+                          disabled={isVendorSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Primary Contact Phone</label>
+                        <input
+                          type="text"
+                          value={vendorFormData.contact}
+                          onChange={(e) => setVendorFormData({ ...vendorFormData, contact: e.target.value })}
+                          disabled={isVendorSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Email Address</label>
+                        <input
+                          type="email"
+                          value={vendorFormData.email}
+                          onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
+                          disabled={isVendorSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Contact Person Name</label>
                       <input
                         type="text"
                         value={vendorFormData.contact_name}
-                        onChange={(e) =>
-                          setVendorFormData({ ...vendorFormData, contact_name: e.target.value })
-                        }
+                        onChange={(e) => setVendorFormData({ ...vendorFormData, contact_name: e.target.value })}
                         disabled={isVendorSubmitting}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
                       />
                     </div>
-                  </div>
 
-                  <div className="form-group">
-                    <label>Address</label>
-                    <textarea
-                      value={vendorFormData.address}
-                      onChange={(e) =>
-                        setVendorFormData({ ...vendorFormData, address: e.target.value })
-                      }
-                      disabled={isVendorSubmitting}
-                      rows="3"
-                    />
-                  </div>
-
-                  <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={isVendorSubmitting}>
-                      {isVendorSubmitting ? "Saving..." : "Save Vendor"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setShowVendorForm(false)}
-                      disabled={isVendorSubmitting}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            <div className="users-table-container">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Party Name</th>
-                    <th>Contact</th>
-                    <th>Email</th>
-                    <th>GSTIN</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendors.map((vendor) => (
-                    <tr key={vendor.id}>
-                      <td>
-                        <strong>{vendor.party_name}</strong>
-                      </td>
-                      <td>{vendor.contact || '-'}</td>
-                      <td>{vendor.email || '-'}</td>
-                      <td>{vendor.gstin || '-'}</td>
-                      <td>
-                        <button
-                          className="btn-edit"
-                          onClick={() => handleEditVendor(vendor)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteVendor(vendor.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {vendors.length === 0 && (
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: 'center' }}>No vendors found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'company' && (
-          <>
-            <div className="section-header">
-              <h2>Company Profiles</h2>
-              <button className="btn-primary" onClick={handleAddNewCompany}>
-                + Add New Company
-              </button>
-            </div>
-            
-            {showCompanyForm && (
-              <div className="user-form-container">
-                <h3>{editingCompany ? "Edit Company Details" : "Create Company Profile"}</h3>
-                <form onSubmit={handleCompanySubmit} className="user-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Company Name *</label>
-                      <input
-                        type="text"
-                        value={companyFormData.name}
-                        onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
-                        required
-                        disabled={isCompanySubmitting}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Corporate Address</label>
+                      <textarea
+                        value={vendorFormData.address}
+                        onChange={(e) => setVendorFormData({ ...vendorFormData, address: e.target.value })}
+                        disabled={isVendorSubmitting}
+                        rows={3}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none font-medium"
                       />
                     </div>
-                    <div className="form-group">
-                      <label>GSTIN *</label>
-                      <input
-                        type="text"
-                        value={companyFormData.gstin}
-                        onChange={(e) => setCompanyFormData({ ...companyFormData, gstin: e.target.value })}
-                        required
-                        disabled={isCompanySubmitting}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Contact Number *</label>
-                      <input
-                        type="text"
-                        value={companyFormData.contact}
-                        onChange={(e) => setCompanyFormData({ ...companyFormData, contact: e.target.value })}
-                        required
-                        disabled={isCompanySubmitting}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Email Address *</label>
-                      <input
-                        type="email"
-                        value={companyFormData.email}
-                        onChange={(e) => setCompanyFormData({ ...companyFormData, email: e.target.value })}
-                        required
-                        disabled={isCompanySubmitting}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Company Address *</label>
-                    <textarea
-                      value={companyFormData.address}
-                      onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
-                      required
-                      disabled={isCompanySubmitting}
-                      rows="2"
-                    />
-                  </div>
-
-                  <div className="terms-section">
-                    <div className="terms-header">
-                      <h3>Terms and Conditions</h3>
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                      <button 
+                        type="submit" 
+                        disabled={isVendorSubmitting}
+                        className="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        {isVendorSubmitting ? "Saving..." : "Save Vendor Details"}
+                      </button>
                       <button 
                         type="button" 
-                        className="btn-secondary btn-sm" 
-                        onClick={handleAddTerm}
+                        onClick={() => setShowVendorForm(false)}
+                        className="px-5 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all cursor-pointer"
                       >
-                        <Plus size={14} /> Add Term
+                        Cancel
                       </button>
                     </div>
-                    
-                    {companyFormData.terms.length === 0 ? (
-                      <p className="empty-state">No terms added yet.</p>
-                    ) : (
-                      <div className="terms-list">
-                        {companyFormData.terms.map((term, index) => (
-                          <div key={index} className="term-item">
-                            <span className="term-number">{index + 1}.</span>
-                            <textarea
-                              value={term}
-                              onChange={(e) => handleTermChange(index, e.target.value)}
-                              disabled={isCompanySubmitting}
-                              rows="2"
-                            />
-                            <button
-                              type="button"
-                              className="btn-icon-danger"
-                              onClick={() => handleRemoveTerm(index)}
-                              disabled={isCompanySubmitting}
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  </form>
+                </div>
+              )}
 
-                  <div className="form-actions" style={{ marginTop: '2rem' }}>
-                    <button type="submit" className="btn-primary" disabled={isCompanySubmitting}>
-                      {isCompanySubmitting ? "Saving..." : "Save Profile & Terms"}
-                    </button>
-                    <button 
-                      type="button" 
-                      className="btn-secondary" 
-                      onClick={() => setShowCompanyForm(false)}
-                      disabled={isCompanySubmitting}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {!showCompanyForm && (
-              <div className="users-table-container">
-                <table className="users-table">
-                  <thead>
-                    <tr>
-                      <th>Company Name</th>
-                      <th>GSTIN</th>
-                      <th>Contact</th>
-                      <th>Email</th>
-                      <th>Terms Count</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {companies.map((company) => (
-                      <tr key={company.id}>
-                        <td>
-                          <strong>{company.name}</strong>
-                        </td>
-                        <td>{company.gstin}</td>
-                        <td>{company.contact}</td>
-                        <td>{company.email}</td>
-                        <td>{company.terms?.length || 0}</td>
-                        <td>
-                          <button
-                            className="btn-edit"
-                            onClick={() => handleEditCompany(company)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn-delete"
-                            onClick={() => handleDeleteCompany(company.id)}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {companies.length === 0 && (
+              {/* Vendors Ledger Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                    <thead className="bg-slate-50">
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center' }}>No company profiles found. Click "+ Add New Company" to create one.</td>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Party / Vendor Name</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">GSTIN</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {vendors.map((vendor) => (
+                        <tr key={vendor.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-900 font-bold">{vendor.party_name}</strong></td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{vendor.contact || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{vendor.email || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-bold uppercase">{vendor.gstin || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleEditVendor(vendor)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleDeleteVendor(vendor.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {vendors.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center text-slate-500 font-medium">No vendors found. Select "+ Add New Vendor".</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'transporters' && (
-          <>
-            <div className="section-header">
-              <h2>Transporter Management</h2>
-              <button className="btn-primary" onClick={() => {
-                setEditingTransporter(null);
-                setTransporterFormData({ name: "", contact_number: "" });
-                setShowTransporterForm(true);
-              }}>
-                + Add Transporter
-              </button>
             </div>
+          )}
 
-            {showTransporterForm && (
-              <div className="user-form-container">
-                <h3>{editingTransporter ? "Edit Transporter" : "Add Transporter"}</h3>
-                <form onSubmit={handleTransporterSubmit} className="user-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Name *</label>
-                      <input
-                        type="text"
-                        value={transporterFormData.name}
-                        onChange={(e) => setTransporterFormData({ ...transporterFormData, name: e.target.value })}
+          {/* COMPANY PROFILE TAB */}
+          {activeTab === 'company' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Corporate Profiles</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Manage billing entities, invoicing addresses, and standard PO terms.</p>
+                </div>
+                <button 
+                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  onClick={handleAddNewCompany}
+                >
+                  <Plus size={15} /> Add New Company
+                </button>
+              </div>
+
+              {showCompanyForm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                    {editingCompany ? "📝 Edit Company Profile" : "✨ Create Corporate Billing Profile"}
+                  </h3>
+                  <form onSubmit={handleCompanySubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Company Billing Name *</label>
+                        <input
+                          type="text"
+                          value={companyFormData.name}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
+                          required
+                          disabled={isCompanySubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">GSTIN / Corporate Tax ID *</label>
+                        <input
+                          type="text"
+                          value={companyFormData.gstin}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, gstin: e.target.value })}
+                          required
+                          disabled={isCompanySubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Billing Contact Number *</label>
+                        <input
+                          type="text"
+                          value={companyFormData.contact}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, contact: e.target.value })}
+                          required
+                          disabled={isCompanySubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Email Address *</label>
+                        <input
+                          type="email"
+                          value={companyFormData.email}
+                          onChange={(e) => setCompanyFormData({ ...companyFormData, email: e.target.value })}
+                          required
+                          disabled={isCompanySubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Corporate Address *</label>
+                      <textarea
+                        value={companyFormData.address}
+                        onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
                         required
+                        disabled={isCompanySubmitting}
+                        rows={2}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none font-medium"
+                      />
+                    </div>
+
+                    {/* Invoicing Terms */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <span className="text-xs font-bold text-slate-800">Standard Purchase Terms</span>
+                        <button 
+                          type="button" 
+                          onClick={handleAddTerm}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} /> Add term
+                        </button>
+                      </div>
+
+                      {companyFormData.terms.length === 0 ? (
+                        <p className="text-slate-500 text-xs font-medium italic">No terms defined for this profile.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {companyFormData.terms.map((term, index) => (
+                            <div key={index} className="flex gap-2 items-start bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                              <span className="text-xs font-bold text-slate-400 mt-2 shrink-0">{index + 1}.</span>
+                              <textarea
+                                value={term}
+                                onChange={(e) => handleTermChange(index, e.target.value)}
+                                disabled={isCompanySubmitting}
+                                rows={2}
+                                className="w-full text-xs border-0 bg-transparent text-slate-800 font-medium resize-none focus:outline-none p-0"
+                                placeholder="E.g. Payment is net 30 days..."
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTerm(index)}
+                                disabled={isCompanySubmitting}
+                                className="p-1 hover:bg-red-50 text-red-600 rounded border border-transparent hover:border-red-200 transition-all shrink-0 cursor-pointer"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                      <button 
+                        type="submit" 
+                        disabled={isCompanySubmitting}
+                        className="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        {isCompanySubmitting ? "Saving..." : "Save Corporate Profile"}
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowCompanyForm(false)}
+                        className="px-5 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Company Profiles Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Company Name</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">GSTIN</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Billing Contact</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Terms Count</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {companies.map((company) => (
+                        <tr key={company.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-900 font-bold">{company.name}</strong></td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-bold uppercase">{company.gstin}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{company.contact}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{company.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-bold">{company.terms?.length || 0}</td>
+                          <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleEditCompany(company)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleDeleteCompany(company.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {companies.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-slate-500 font-medium">No company billing profile defined.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TRANSPORTERS TAB */}
+          {activeTab === 'transporters' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Transporter Directory</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Manage logistics partners and mobile contact details.</p>
+                </div>
+                <button 
+                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => {
+                    setEditingTransporter(null);
+                    setTransporterFormData({ name: "", contact_number: "" });
+                    setShowTransporterForm(true);
+                  }}
+                >
+                  <Plus size={15} /> Add Transporter
+                </button>
+              </div>
+
+              {showTransporterForm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                    {editingTransporter ? "📝 Edit Transporter Details" : "✨ Add Logistics Partner"}
+                  </h3>
+                  <form onSubmit={handleTransporterSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Company Name *</label>
+                        <input
+                          type="text"
+                          value={transporterFormData.name}
+                          onChange={(e) => setTransporterFormData({ ...transporterFormData, name: e.target.value })}
+                          required
+                          disabled={isTransporterSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Logistics Contact Number *</label>
+                        <input
+                          type="text"
+                          value={transporterFormData.contact_number}
+                          onChange={(e) => setTransporterFormData({ ...transporterFormData, contact_number: e.target.value })}
+                          required
+                          disabled={isTransporterSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                      <button 
+                        type="submit" 
                         disabled={isTransporterSubmitting}
-                      />
+                        className="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        {isTransporterSubmitting ? "Saving..." : "Save Transporter"}
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowTransporterForm(false)}
+                        className="px-5 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
                     </div>
-                    <div className="form-group">
-                      <label>Contact Number *</label>
-                      <input
-                        type="text"
-                        value={transporterFormData.contact_number}
-                        onChange={(e) => setTransporterFormData({ ...transporterFormData, contact_number: e.target.value })}
-                        required
-                        disabled={isTransporterSubmitting}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={isTransporterSubmitting}>
-                      {isTransporterSubmitting ? "Saving..." : "Save Transporter"}
-                    </button>
-                    <button type="button" className="btn-secondary" onClick={() => setShowTransporterForm(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                  </form>
+                </div>
+              )}
+
+              {/* Transporters Ledger Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Logistics Name</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Number</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {transporters.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-900 font-bold">{t.name}</strong></td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{t.contact_number}</td>
+                          <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleEditTransporter(t)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleDeleteTransporter(t.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {transporters.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-6 py-8 text-center text-slate-500 font-medium">No transporters defined.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
-
-            <div className="users-table-container">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Contact Number</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transporters.map((t) => (
-                    <tr key={t.id}>
-                      <td><strong>{t.name}</strong></td>
-                      <td>{t.contact_number}</td>
-                      <td>
-                        <button className="btn-edit" onClick={() => handleEditTransporter(t)}>Edit</button>
-                        <button className="btn-delete" onClick={() => handleDeleteTransporter(t.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {transporters.length === 0 && (
-                    <tr>
-                      <td colSpan="3" style={{ textAlign: 'center' }}>No transporters found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
             </div>
-          </>
-        )}
+          )}
 
-        {activeTab === 'receivers' && (
-          <>
-            <div className="section-header">
-              <h2>Receiver Management</h2>
-              <button className="btn-primary" onClick={() => {
-                setEditingReceiver(null);
-                setReceiverFormData({ name: "", contact_number: "" });
-                setShowReceiverForm(true);
-              }}>
-                + Add Receiver
-              </button>
-            </div>
-
-            {showReceiverForm && (
-              <div className="user-form-container">
-                <h3>{editingReceiver ? "Edit Receiver" : "Add Receiver"}</h3>
-                <form onSubmit={handleReceiverSubmit} className="user-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Name *</label>
-                      <input
-                        type="text"
-                        value={receiverFormData.name}
-                        onChange={(e) => setReceiverFormData({ ...receiverFormData, name: e.target.value })}
-                        required
-                        disabled={isReceiverSubmitting}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Contact Number *</label>
-                      <input
-                        type="text"
-                        value={receiverFormData.contact_number}
-                        onChange={(e) => setReceiverFormData({ ...receiverFormData, contact_number: e.target.value })}
-                        required
-                        disabled={isReceiverSubmitting}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-actions">
-                    <button type="submit" className="btn-primary" disabled={isReceiverSubmitting}>
-                      {isReceiverSubmitting ? "Saving..." : "Save Receiver"}
-                    </button>
-                    <button type="button" className="btn-secondary" onClick={() => setShowReceiverForm(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+          {/* RECEIVERS TAB */}
+          {activeTab === 'receivers' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-950">Receivers Directory</h2>
+                  <p className="text-slate-500 text-xs mt-0.5">Manage delivery partner sites and contact credentials.</p>
+                </div>
+                <button 
+                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => {
+                    setEditingReceiver(null);
+                    setReceiverFormData({ name: "", contact_number: "" });
+                    setShowReceiverForm(true);
+                  }}
+                >
+                  <Plus size={15} /> Add Receiver
+                </button>
               </div>
-            )}
 
-            <div className="users-table-container">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Contact Number</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receivers.map((r) => (
-                    <tr key={r.id}>
-                      <td><strong>{r.name}</strong></td>
-                      <td>{r.contact_number}</td>
-                      <td>
-                        <button className="btn-edit" onClick={() => handleEditReceiver(r)}>Edit</button>
-                        <button className="btn-delete" onClick={() => handleDeleteReceiver(r.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {receivers.length === 0 && (
-                    <tr>
-                      <td colSpan="3" style={{ textAlign: 'center' }}>No receivers found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {showReceiverForm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                    {editingReceiver ? "📝 Edit Receiver Details" : "✨ Add Stock Receiver Profile"}
+                  </h3>
+                  <form onSubmit={handleReceiverSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Receiver Name *</label>
+                        <input
+                          type="text"
+                          value={receiverFormData.name}
+                          onChange={(e) => setReceiverFormData({ ...receiverFormData, name: e.target.value })}
+                          required
+                          disabled={isReceiverSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Contact Number *</label>
+                        <input
+                          type="text"
+                          value={receiverFormData.contact_number}
+                          onChange={(e) => setReceiverFormData({ ...receiverFormData, contact_number: e.target.value })}
+                          required
+                          disabled={isReceiverSubmitting}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-3 border-t border-slate-100">
+                      <button 
+                        type="submit" 
+                        disabled={isReceiverSubmitting}
+                        className="px-5 py-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-all cursor-pointer"
+                      >
+                        {isReceiverSubmitting ? "Saving..." : "Save Receiver"}
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowReceiverForm(false)}
+                        className="px-5 py-2.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Receivers Ledger Table */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Receiver Site / Name</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Number</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-100">
+                      {receivers.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-900 font-bold">{r.name}</strong></td>
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{r.contact_number}</td>
+                          <td className="px-6 py-4 whitespace-nowrap flex gap-2">
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleEditReceiver(r)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg transition-all cursor-pointer"
+                              onClick={() => handleDeleteReceiver(r.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {receivers.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-6 py-8 text-center text-slate-500 font-medium">No receivers defined.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+          {/* SECURE PORTAL LINKS TAB */}
+          {activeTab === 'portal_links' && (
+            <div className="space-y-8">
+              
+              {/* Accessibility Header + Searchbar */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-950 flex items-center gap-2">
+                      <Shield className="text-indigo-600" size={24} />
+                      Permanent Secure Portal Links
+                    </h2>
+                    <p className="text-slate-500 text-xs md:text-sm mt-1 font-medium">
+                      Copy and share permanent links for vendors, transporters, and receivers to securely submit reports.
+                    </p>
+                  </div>
+                  {/* Accessibility Searchbar */}
+                  <div className="relative w-full md:w-80 shadow-sm rounded-lg">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search size={18} className="text-slate-400" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search by name or number..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* THREE DISTINCT SECTIONS FOR PORTAL LINKS */}
+              
+              {/* SECTION 1: SUPPLIER / VENDOR PORTALS */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition-shadow duration-300">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <span className="bg-emerald-500/10 text-emerald-600 p-1.5 rounded-lg">
+                    <ShoppingBag size={18} />
+                  </span>
+                  Supplier / Vendor Portals
+                </h3>
+                <div className="overflow-hidden border border-slate-150 rounded-xl">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                      <thead className="bg-slate-50/70">
+                        <tr>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Vendor Name</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Number</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Permanent Portal URL</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-slate-100">
+                        {filteredVendors.map((v) => {
+                          const baseUrl = window.location.origin;
+                          const mappedVendorId = vendorPortalLinks[v.party_name?.trim().toLowerCase()];
+                          
+                          let link = v.portal_link;
+                          if (!link && mappedVendorId) {
+                            link = `${baseUrl}/vendor-portal/${mappedVendorId}`;
+                          } else if (!link) {
+                            const vendorIndex = vendors.indexOf(v) + 1;
+                            link = `${baseUrl}/vendor-portal/VN-${String(vendorIndex).padStart(3, "0")}`;
+                          } else if (!link.startsWith("http")) {
+                            link = `${baseUrl}${link}`;
+                          }
+
+                          return (
+                            <tr key={v.id} className="hover:bg-slate-50/30 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-950 font-bold">{v.party_name}</strong></td>
+                              <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-semibold">{v.contact || "—"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap max-w-xs md:max-w-sm truncate">
+                                <code className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded text-xs font-mono text-indigo-700 break-all select-all">
+                                  {link}
+                                </code>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button 
+                                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(link);
+                                    alert("Vendor Portal Link copied to clipboard!");
+                                  }}
+                                >
+                                  <Copy size={13} /> Copy Link
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredVendors.length === 0 && (
+                          <tr>
+                            <td colSpan="4" className="px-6 py-8 text-center text-slate-500 font-medium italic">No matching vendors found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: TRANSPORTER / LOGISTICS PORTALS */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition-shadow duration-300">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <span className="bg-blue-500/10 text-blue-600 p-1.5 rounded-lg">
+                    <Truck size={18} />
+                  </span>
+                  Transporter / Logistics Portals
+                </h3>
+                <div className="overflow-hidden border border-slate-150 rounded-xl">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                      <thead className="bg-slate-50/70">
+                        <tr>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Transporter Name</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Number</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Permanent Portal URL</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-slate-100">
+                        {filteredTransporters.map((t) => {
+                          const baseUrl = window.location.origin;
+                          let link = t.portal_link || `/transporter-portal/${t.id}`;
+                          if (!link.startsWith("http")) {
+                            link = `${baseUrl}${link}`;
+                          }
+                          
+                          return (
+                            <tr key={t.id} className="hover:bg-slate-50/30 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-950 font-bold">{t.name}</strong></td>
+                              <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-semibold">{t.contact_number || "—"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap max-w-xs md:max-w-sm truncate">
+                                <code className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded text-xs font-mono text-indigo-700 break-all select-all">
+                                  {link}
+                                </code>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button 
+                                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(link);
+                                    alert("Transporter Portal Link copied to clipboard!");
+                                  }}
+                                >
+                                  <Copy size={13} /> Copy Link
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredTransporters.length === 0 && (
+                          <tr>
+                            <td colSpan="4" className="px-6 py-8 text-center text-slate-500 font-medium italic">No matching transporters found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: RECEIVER PORTALS */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition-shadow duration-300">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <span className="bg-purple-500/10 text-purple-600 p-1.5 rounded-lg">
+                    <Package size={18} />
+                  </span>
+                  Receiver / Site Portals
+                </h3>
+                <div className="overflow-hidden border border-slate-150 rounded-xl">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
+                      <thead className="bg-slate-50/70">
+                        <tr>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Receiver Name</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Number</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Permanent Portal URL</th>
+                          <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-slate-100">
+                        {filteredReceivers.map((r) => {
+                          const baseUrl = window.location.origin;
+                          let link = r.portal_link || `/receiver-portal/${r.id}`;
+                          if (!link.startsWith("http")) {
+                            link = `${baseUrl}${link}`;
+                          }
+                          
+                          return (
+                            <tr key={r.id} className="hover:bg-slate-50/30 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap"><strong className="text-slate-950 font-bold">{r.name}</strong></td>
+                              <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-semibold">{r.contact_number || "—"}</td>
+                              <td className="px-6 py-4 whitespace-nowrap max-w-xs md:max-w-sm truncate">
+                                <code className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded text-xs font-mono text-indigo-700 break-all select-all">
+                                  {link}
+                                </code>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button 
+                                  className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(link);
+                                    alert("Receiver Portal Link copied to clipboard!");
+                                  }}
+                                >
+                                  <Copy size={13} /> Copy Link
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredReceivers.length === 0 && (
+                          <tr>
+                            <td colSpan="4" className="px-6 py-8 text-center text-slate-500 font-medium italic">No matching receivers found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );

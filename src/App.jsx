@@ -16,6 +16,9 @@ import Login from "./pages/Login";
 import VendorConfirmation from "./pages/VendorConfirmation";
 import TransporterConfirmation from "./pages/TransporterConfirmation";
 import ReceiverConfirmation from "./pages/ReceiverConfirmation";
+import VendorPortal from "./pages/VendorPortal";
+import TransporterPortal from "./pages/TransporterPortal";
+import ReceiverPortal from "./pages/ReceiverPortal";
 import useAuthStore from "./store/useAuthStore";
 import "./App.css";
 
@@ -42,7 +45,10 @@ const AppContent = () => {
   const isConfirmationPage = 
     location.pathname.startsWith("/confirm-po/") ||
     location.pathname.startsWith("/transporter-confirmation/") ||
-    location.pathname.startsWith("/receiver-confirmation/");
+    location.pathname.startsWith("/receiver-confirmation/") ||
+    location.pathname.startsWith("/vendor-portal/") ||
+    location.pathname.startsWith("/transporter-portal/") ||
+    location.pathname.startsWith("/receiver-portal/");
 
   const showSidebar = currentUser && !isConfirmationPage;
 
@@ -56,6 +62,9 @@ const AppContent = () => {
             <Route path="/confirm-po/:id" element={<VendorConfirmation />} />
             <Route path="/transporter-confirmation/:id" element={<TransporterConfirmation />} />
             <Route path="/receiver-confirmation/:id" element={<ReceiverConfirmation />} />
+            <Route path="/vendor-portal/:vendorId" element={<VendorPortal />} />
+            <Route path="/transporter-portal/:transporterId" element={<TransporterPortal />} />
+            <Route path="/receiver-portal/:receiverId" element={<ReceiverPortal />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />

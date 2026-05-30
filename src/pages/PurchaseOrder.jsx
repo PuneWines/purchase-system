@@ -661,13 +661,73 @@ const PurchaseOrder = () => {
 
       const insertedPoId = insertedData[0]?.id;
 
+      // --- Fetch / Generate Portal Links ---
+      const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
+
+      // 1. Get/Create Vendor Portal Link
+      let vendorPortalLink = "";
+      if (activeVendorDetails?.contact) {
+        const { data: vendorRow } = await supabase
+          .from("vendors")
+          .select("portal_link")
+          .eq("party_name", activeParty)
+          .limit(1)
+          .single();
+
+        let dbPortalLink = vendorRow?.portal_link;
+        if (!dbPortalLink) {
+          dbPortalLink = `/vendor-portal/${currentVendorId}`;
+          await supabase
+            .from("vendors")
+            .update({ portal_link: dbPortalLink })
+            .eq("party_name", activeParty);
+        }
+        vendorPortalLink = dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
+      }
+
+      // 2. Get/Create Transporter Portal Link
+      let transporterPortalLink = "";
+      if (selectedTransporter) {
+        const transporterRow = transporters.find(t => t.contact_number === selectedTransporter);
+        if (transporterRow) {
+          let dbPortalLink = transporterRow.portal_link;
+          if (!dbPortalLink) {
+            dbPortalLink = `/transporter-portal/${transporterRow.id}`;
+            await supabase
+              .from("transporters")
+              .update({ portal_link: dbPortalLink })
+              .eq("id", transporterRow.id);
+          }
+          transporterPortalLink = dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
+        }
+      }
+
+      // 3. Get/Create Receiver Portal Link
+      let receiverPortalLink = "";
+      if (selectedReceiver) {
+        const receiverRow = receivers.find(r => r.contact_number === selectedReceiver);
+        if (receiverRow) {
+          let dbPortalLink = receiverRow.portal_link;
+          if (!dbPortalLink) {
+            dbPortalLink = `/receiver-portal/${receiverRow.id}`;
+            try {
+              await supabase
+                .from("receivers")
+                .update({ portal_link: dbPortalLink })
+                .eq("id", receiverRow.id);
+            } catch (err) {
+              console.warn("Could not save portal_link for receiver in database (column might be missing):", err);
+            }
+          }
+          receiverPortalLink = dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
+        }
+      }
+
       // --- Send WhatsApp Messages ---
       const whatsappPromises = [];
 
-      // 1. Send PO Confirmation to Trader/Vendor
-      if (activeVendorDetails?.contact && insertedPoId) {
-        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-        const confirmLink = `${baseUrl}/confirm-po/${insertedPoId}`;
+      // 1. Send PO Confirmation to Trader/Vendor via their permanent portal
+      if (activeVendorDetails?.contact && insertedPoId && vendorPortalLink) {
         let formattedPhone = activeVendorDetails.contact.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
 
@@ -676,7 +736,7 @@ const PurchaseOrder = () => {
             formattedPhone,
             activeParty,
             nextPoNumber,
-            confirmLink,
+            vendorPortalLink,
             activeCompany?.name || COMPANY.name,
             totalOrderQty,
             traderUrl
@@ -684,10 +744,8 @@ const PurchaseOrder = () => {
         );
       }
 
-      // 2. Send Transporter Pick-up Request to Transporter
-      if (selectedTransporter && insertedPoId) {
-        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-        const confirmLink = `${baseUrl}/transporter-confirmation/${insertedPoId}`;
+      // 2. Send Transporter Pick-up Request to Transporter via their permanent portal
+      if (selectedTransporter && insertedPoId && transporterPortalLink) {
         let formattedPhone = selectedTransporter.replace(/\D/g, "");
         if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
 
@@ -695,7 +753,7 @@ const PurchaseOrder = () => {
           sendTransporterConfirmationMessage(
             formattedPhone,
             nextPoNumber,
-            confirmLink,
+            transporterPortalLink,
             activeCompany?.name || COMPANY.name,
             activeParty,
             traderUrl

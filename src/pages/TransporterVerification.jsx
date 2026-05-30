@@ -63,6 +63,12 @@ const TransporterVerification = () => {
     { key: "vendor_name", label: "Vendor Name", sortable: true },
     { key: "transporter_number", label: "Transporter Contact", sortable: true },
     {
+      key: "tp_number",
+      label: "TP Number",
+      sortable: true,
+      render: (tp) => tp || <span style={{ color: "#94a3b8" }}>—</span>
+    },
+    {
       key: "trader_pdf_url",
       label: "PO PDF",
       sortable: false,

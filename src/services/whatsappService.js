@@ -480,45 +480,9 @@ export const sendOTNotification = async (
   }
 };
 
-/**
- * Generate a secure, lightweight hash for a specific role and PO ID.
- * Since this is processed client-side, we use a simple, robust rolling hash.
- */
-export const generateRoleToken = (poId, role) => {
-  const SECRET = "drinqkart-secure-pms-key-2026";
-  const str = `${poId}-${role}-${SECRET}`;
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(36);
-};
-
-const appendTokenToLink = (confirmLink, role) => {
-  if (!confirmLink) return confirmLink;
-  try {
-    const urlObj = new URL(confirmLink);
-    const pathParts = urlObj.pathname.split('/');
-    const poId = pathParts[pathParts.length - 1];
-    if (poId) {
-      const token = generateRoleToken(poId, role);
-      urlObj.searchParams.set("token", token);
-      return urlObj.toString();
-    }
-  } catch (err) {
-    const parts = confirmLink.split('?');
-    const path = parts[0];
-    const pathParts = path.split('/');
-    const poId = pathParts[pathParts.length - 1];
-    if (poId) {
-      const token = generateRoleToken(poId, role);
-      return `${confirmLink}${confirmLink.includes('?') ? '&' : '?'}token=${token}`;
-    }
-  }
-  return confirmLink;
-};
+// NOTE: One-time token generation removed.
+// Vendor and Transporter now use permanent portal links stored in the
+// vendors.portal_link and transporters.portal_link database columns.
 
 /**
  * Resolve the transporter's name from their phone number.
@@ -605,19 +569,18 @@ const resolveShopName = async (poNumber) => {
 
 /**
  * Send the purchase order confirmation message
- * 
+ *
  * @param {string} phoneNumber - Vendor's phone number
  * @param {string} vendorName - Vendor name
  * @param {string} poNumber - PO Number
- * @param {string} confirmLink - Confirmation Link
+ * @param {string} portalLink - Vendor's permanent portal link
  * @param {string} companyName - Company/Shop Name
  * @param {number|string} totalQty - Total Order Quantity
  * @param {string} pdfUrl - URL of the generated PO PDF
  */
-export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumber, confirmLink, companyName, totalQty, pdfUrl) => {
+export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumber, portalLink, companyName, totalQty, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending PO confirmation notification...");
-    const secureLink = appendTokenToLink(confirmLink, "vendor");
     const shopName = await resolveShopName(poNumber);
     const finalShopName = shopName || companyName || 'DRINQKART';
 
@@ -629,10 +592,7 @@ Dear *${vendorName}*,
 *Shop Name:* ${finalShopName}
 *Total Qty:* ${totalQty}
 
-🔗 *Action Required Link:*
-${secureLink}
-
-✅ Please click the above link to confirm the order, specify your dispatch date, or provide remarks.
+✅ A new purchase order has been generated for you. Please check your Vendor Portal to review the details and submit confirmation.
 
 THANKS & REGARDS
 TEAM ${finalShopName}`;
@@ -656,18 +616,17 @@ TEAM ${finalShopName}`;
 
 /**
  * Send the transporter confirmation message
- * 
+ *
  * @param {string} phoneNumber - Transporter's phone number
  * @param {string} poNumber - PO Number
- * @param {string} confirmLink - Confirmation Link
+ * @param {string} portalLink - Transporter's permanent portal link
  * @param {string} companyName - Company/Shop Name
  * @param {string} vendorName - Vendor name
  * @param {string} pdfUrl - URL of the generated PO PDF
  */
-export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
+export const sendTransporterConfirmationMessage = async (phoneNumber, poNumber, portalLink, companyName, vendorName, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending Transporter confirmation notification...");
-    const secureLink = appendTokenToLink(confirmLink, "transporter");
     const transporterName = await resolveTransporterName(phoneNumber);
     const shopName = await resolveShopName(poNumber);
     const finalShopName = shopName || companyName || 'DRINQKART';
@@ -682,10 +641,7 @@ You have a new pick-up request from *${finalShopName}*.
 *Shop Name:* ${finalShopName}
 *Vendor Name:* ${vendorName}
 
-🔗 *Action Required Link:*
-${secureLink}
-
-✅ Please click the above link to confirm the pick-up, specify your pick-up date, and expected delivery date.
+✅ Please log in to your Transporter Portal to review details and confirm or reject this pick-up.
 
 THANKS & REGARDS
 TEAM ${finalShopName}`;
@@ -712,15 +668,14 @@ TEAM ${finalShopName}`;
  * 
  * @param {string} phoneNumber - Receiver's phone number
  * @param {string} poNumber - PO Number
- * @param {string} confirmLink - Confirmation Link
+ * @param {string} portalLink - Receiver's permanent portal link
  * @param {string} companyName - Company/Shop Name
  * @param {string} vendorName - Vendor name
  * @param {string} pdfUrl - URL of the generated PO PDF
  */
-export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, confirmLink, companyName, vendorName, pdfUrl) => {
+export const sendReceiverConfirmationMessage = async (phoneNumber, poNumber, portalLink, companyName, vendorName, pdfUrl) => {
   try {
     console.log("[WhatsApp] Sending Receiver confirmation notification...");
-    const secureLink = appendTokenToLink(confirmLink, "receiver");
     const receiverName = await resolveReceiverName(phoneNumber);
     const shopName = await resolveShopName(poNumber);
     const finalShopName = shopName || companyName || 'DRINQKART';
@@ -734,10 +689,7 @@ A new delivery from *${vendorName}* is on its way to *${finalShopName}*.
 *PO Number:* ${poNumber}
 *Shop Name:* ${finalShopName}
 
-🔗 *Action Required Link:*
-${secureLink}
-
-✅ Please click the above link to confirm the delivery, verify the quantities of the items received, and submit your report.
+✅ Please log in to your Receiver Portal to confirm the delivery, verify the quantities of the items received, and submit your report.
 
 THANKS & REGARDS
 TEAM ${finalShopName}`;
