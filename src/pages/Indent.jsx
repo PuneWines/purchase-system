@@ -294,11 +294,11 @@ const Indent = () => {
     const totalItems = tableData.length;
     const activeItems = tableData.filter(item => {
       const calcs = calculateRow(item);
-      return parseFloat(calcs.orderBox) >= 3.0;
+      return parseFloat(calcs.orderQty) >= 3.0;
     }).length;
     const excludedItems = tableData.filter(item => {
       const calcs = calculateRow(item);
-      return parseFloat(calcs.orderBox) < 3.0;
+      return parseFloat(calcs.orderQty) < 3.0;
     }).length;
     return { totalItems, activeItems, excludedItems };
   };
@@ -666,17 +666,17 @@ const Indent = () => {
 
       tableData.forEach((item) => {
         const calcs = calculateRow(item);
-        const orderBoxVal = parseFloat(calcs.orderBox);
+        const orderQtyVal = parseFloat(calcs.orderQty);
 
-        if (!isNaN(orderBoxVal) && orderBoxVal >= 3.0) {
+        if (!isNaN(orderQtyVal) && orderQtyVal >= 3.0) {
           activeItems.push({ item, calcs });
-        } else if (!isNaN(orderBoxVal) && orderBoxVal < 3.0) {
+        } else if (!isNaN(orderQtyVal) && orderQtyVal < 3.0) {
           excludedItems.push({ item, calcs });
         }
       });
 
       if (activeItems.length === 0) {
-        addToast("No valid data to submit. Only items with 'Order in Box' >= 3.0 are allowed.", "error");
+        addToast("No valid data to submit. Only items with 'Order in Qty' >= 3.0 are allowed.", "error");
         setIsProcessing(false);
         return;
       }
@@ -782,7 +782,7 @@ const Indent = () => {
           order_box: parseFloat(calcs.orderBox) || 0,
           order_qty: parseFloat(calcs.orderQty) || 0,
           is_excluded: true,
-          exclusion_reason: parseFloat(calcs.orderBox) < 0 ? "negative_order_in_box" : "low_order_in_box"
+          exclusion_reason: parseFloat(calcs.orderQty) < 0 ? "negative_order_qty" : "low_order_qty"
         });
       });
 
