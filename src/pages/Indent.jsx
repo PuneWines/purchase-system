@@ -457,7 +457,6 @@ const Indent = () => {
 
     let lastMonthSale = 0;
     let perDaySaleLastMonth = 0;
-    let finalAvgSale = 0;
     let thresholdSale = 0;
     let boxClosingQty = 0;
     let orderBox = 0;
@@ -474,13 +473,12 @@ const Indent = () => {
 
       lastMonthSale = getActive(row.lastMonthSale, row.qtyOut / row.bcs);
       perDaySaleLastMonth = getActive(row.perDaySaleLastMonth, (row.qtyOut / daysDivisor) / row.bcs);
-      finalAvgSale = getActive(row.finalAvgSale, (perDaySaleLastMonth + lastMonthSale) / 2);
       const typeKey = (row.liquorType || "").trim().toUpperCase();
       const matchedKey = typeKey ? Object.keys(thresholdDays).find(
         key => typeKey.includes(key) || key.includes(typeKey)
       ) : null;
       const multiplier = matchedKey ? thresholdDays[matchedKey] : 6;
-      thresholdSale = getActive(row.thresholdSale, finalAvgSale * multiplier);
+      thresholdSale = getActive(row.thresholdSale, perDaySaleLastMonth * multiplier);
       boxClosingQty = getActive(row.boxClosingQty, Math.max(0, row.closingQty) / row.bcs);
       orderBox = getActive(row.orderBox, thresholdSale - boxClosingQty);
       orderQty = getActive(row.orderQty, orderBox * row.bcs);
@@ -489,7 +487,6 @@ const Indent = () => {
     return {
       lastMonthSale: hasData ? (row.lastMonthSale !== undefined && row.lastMonthSale !== null && row.lastMonthSale !== "" ? row.lastMonthSale : lastMonthSale.toFixed(2)) : "",
       perDaySaleLastMonth: hasData ? (row.perDaySaleLastMonth !== undefined && row.perDaySaleLastMonth !== null && row.perDaySaleLastMonth !== "" ? row.perDaySaleLastMonth : perDaySaleLastMonth.toFixed(2)) : "",
-      finalAvgSale: hasData ? (row.finalAvgSale !== undefined && row.finalAvgSale !== null && row.finalAvgSale !== "" ? row.finalAvgSale : finalAvgSale.toFixed(2)) : "",
       thresholdSale: hasData ? (row.thresholdSale !== undefined && row.thresholdSale !== null && row.thresholdSale !== "" ? row.thresholdSale : thresholdSale.toFixed(2)) : "",
       boxClosingQty: hasData ? (row.boxClosingQty !== undefined && row.boxClosingQty !== null && row.boxClosingQty !== "" ? row.boxClosingQty : boxClosingQty.toFixed(2)) : "",
       orderBox: hasData ? (row.orderBox !== undefined && row.orderBox !== null && row.orderBox !== "" ? row.orderBox : orderBox.toFixed(2)) : "",
@@ -748,7 +745,6 @@ const Indent = () => {
           party_name: item.partyName,
           last_month_sale_box: parseFloat(calcs.lastMonthSale) || 0,
           per_day_sale_last_month: parseFloat(calcs.perDaySaleLastMonth) || 0,
-          final_avg_sale: parseFloat(calcs.finalAvgSale) || 0,
           threshold_sale: parseFloat(calcs.thresholdSale) || 0,
           closing_qty_box: parseFloat(calcs.boxClosingQty) || 0,
           order_box: parseFloat(calcs.orderBox) || 0,
@@ -781,7 +777,6 @@ const Indent = () => {
           party_name: item.partyName,
           last_month_sale_box: parseFloat(calcs.lastMonthSale) || 0,
           per_day_sale_last_month: parseFloat(calcs.perDaySaleLastMonth) || 0,
-          final_avg_sale: parseFloat(calcs.finalAvgSale) || 0,
           threshold_sale: parseFloat(calcs.thresholdSale) || 0,
           closing_qty_box: parseFloat(calcs.boxClosingQty) || 0,
           order_box: parseFloat(calcs.orderBox) || 0,
@@ -953,7 +948,7 @@ const Indent = () => {
                       <th colSpan="7" className="bg-emerald-600 border border-emerald-700 px-3 py-1.5 text-center">
                         Excel File Data
                       </th>
-                      <th colSpan="7" className="bg-indigo-600 border border-indigo-700 px-3 py-1.5 text-center rounded-tr-lg">
+                      <th colSpan="6" className="bg-indigo-600 border border-indigo-700 px-3 py-1.5 text-center rounded-tr-lg">
                         Calculations
                       </th>
                     </tr>
@@ -973,7 +968,6 @@ const Indent = () => {
 
                       <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Last Month</th>
                       <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Per Day Sale</th>
-                      <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Final Avg</th>
                       <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Threshold</th>
                       <th className="bg-indigo-50 border border-white px-3 py-2 text-right font-semibold min-w-[115px]">Closing Box</th>
                       <th className="bg-indigo-100 border border-white px-3 py-2 text-right font-bold text-[#4338ca] min-w-[115px]">Order In Box</th>
@@ -1011,7 +1005,6 @@ const Indent = () => {
                           {/* Calculations Display */}
                           <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.lastMonthSale || "—"}</td>
                           <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.perDaySaleLastMonth || "—"}</td>
-                          <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.finalAvgSale || "—"}</td>
                           <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.thresholdSale || "—"}</td>
                           <td className="border-r border-[#e2e8f0] px-3 py-2 text-right font-medium text-indigo-950 bg-indigo-50/10">{calcs.boxClosingQty || "—"}</td>
 

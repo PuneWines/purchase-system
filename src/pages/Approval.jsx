@@ -597,7 +597,6 @@ const Approval = () => {
                       <th style={thStyle}>Item Name</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Box</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Qty</th>
-                      <th style={{ ...thStyle, textAlign: 'right' }}>Final Avg Sale</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Closing Qty</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>B/Cs</th>
                       <th style={thStyle}>Mls</th>
@@ -675,7 +674,6 @@ const Approval = () => {
                             />
                           )}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
                         <td style={tdStyle}>{item.mls || "-"}</td>
@@ -776,7 +774,6 @@ const Approval = () => {
                               <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Item Name</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Box</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Qty</th>
-                              <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Final Avg Sale</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Closing Qty</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>B/Cs</th>
                               <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Mls</th>
@@ -817,7 +814,6 @@ const Approval = () => {
                                   <td style={tdStyle}>{item.item_name}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_box || "-"}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_qty || "-"}</td>
-                                  <td style={{ ...tdStyle, textAlign: 'right' }}>{item.final_avg_sale || "-"}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
                                   <td style={tdStyle}>{item.mls || "-"}</td>
@@ -830,7 +826,7 @@ const Approval = () => {
                                (item.brand_name && item.brand_name.toLowerCase().includes(excludedSearchQuery.toLowerCase())))
                             ).length === 0 && (
                               <tr>
-                                <td colSpan={10} style={{ ...tdStyle, textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
                                   No excluded items found matching your search.
                                 </td>
                               </tr>
