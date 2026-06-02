@@ -77,8 +77,6 @@ const Settings = () => {
   const [isReceiverSubmitting, setIsReceiverSubmitting] = useState(false);
   const [receiverFormData, setReceiverFormData] = useState({ name: "", contact_number: "" });
 
-  const [vendorPortalLinks, setVendorPortalLinks] = useState({});
-
   useEffect(() => {
     fetchUsers();
     fetchVendors();
@@ -86,7 +84,6 @@ const Settings = () => {
     fetchCompanySettings();
     fetchTransporters();
     fetchReceivers();
-    fetchVendorPortalLinks();
   }, [fetchUsers, fetchVendors, fetchCompanySettings]);
 
   const fetchTransporters = async () => {
@@ -97,25 +94,6 @@ const Settings = () => {
   const fetchReceivers = async () => {
     const { data } = await supabase.from("receivers").select("*").order("created_at", { ascending: false });
     if (data) setReceivers(data);
-  };
-
-  const fetchVendorPortalLinks = async () => {
-    try {
-      const { data: pos } = await supabase
-        .from("purchase_orders")
-        .select("vendor_name, vendor_id")
-        .not("vendor_id", "is", null);
-
-      const mapping = {};
-      pos?.forEach(po => {
-        if (po.vendor_name && po.vendor_id) {
-          mapping[po.vendor_name.trim().toLowerCase()] = po.vendor_id;
-        }
-      });
-      setVendorPortalLinks(mapping);
-    } catch (err) {
-      console.error("[Settings] Error resolving vendor portal links:", err);
-    }
   };
 
 
@@ -1412,15 +1390,9 @@ const Settings = () => {
                       <tbody className="bg-white divide-y divide-slate-100">
                         {filteredVendors.map((v) => {
                           const baseUrl = window.location.origin;
-                          const mappedVendorId = vendorPortalLinks[v.party_name?.trim().toLowerCase()];
                           
-                          let link = v.portal_link;
-                          if (!link && mappedVendorId) {
-                            link = `${baseUrl}/vendor-portal/${mappedVendorId}`;
-                          } else if (!link) {
-                            const vendorIndex = vendors.indexOf(v) + 1;
-                            link = `${baseUrl}/vendor-portal/VN-${String(vendorIndex).padStart(3, "0")}`;
-                          } else if (!link.startsWith("http")) {
+                          let link = v.portal_link || `/vendor-portal/${v.id}`;
+                          if (!link.startsWith("http")) {
                             link = `${baseUrl}${link}`;
                           }
 

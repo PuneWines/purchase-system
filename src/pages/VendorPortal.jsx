@@ -66,31 +66,36 @@ const VendorPortal = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch POs matching this vendor_id that are pending trader action
+      // 1. Resolve numeric ID (handles backward-compatibility with VN-xxx)
+      let numericId = vendorId;
+      if (typeof vendorId === "string" && vendorId.startsWith("VN-")) {
+        numericId = parseInt(vendorId.replace("VN-", ""), 10);
+      }
+
+      // 2. Fetch vendor name from vendors table
+      const { data: vendorRow, error: vendorErr } = await supabase
+        .from("vendors")
+        .select("id, party_name")
+        .eq("id", numericId)
+        .limit(1)
+        .single();
+
+      if (vendorErr || !vendorRow) {
+        throw new Error(vendorErr?.message || "Vendor profile not found.");
+      }
+
+      setVendorName(vendorRow.party_name);
+
+      // 3. Fetch POs matching this vendor name that are pending trader action
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
-        .eq("vendor_id", vendorId)
+        .eq("vendor_name", vendorRow.party_name)
         .or("trader_status.is.null,trader_status.eq.")
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
       setPoList(pos || []);
-
-      // 2. Fetch vendor name
-      if (pos && pos.length > 0) {
-        setVendorName(pos[0].vendor_name);
-      } else {
-        // Fallback: look up in vendors table
-        const { data: vData } = await supabase
-          .from("vendors")
-          .select("party_name")
-          .like("portal_link", `%/vendor-portal/${vendorId}`)
-          .limit(1);
-        if (vData && vData.length > 0) {
-          setVendorName(vData[0].party_name);
-        }
-      }
 
       // Initialize form fields for submitted POs
       const newTpNumbers = {};

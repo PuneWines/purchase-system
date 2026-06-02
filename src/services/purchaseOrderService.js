@@ -74,27 +74,17 @@ export const fetchPageData = async () => {
 };
 
 export const generateVendorId = async (activeParty) => {
-  const { data: existingVendorData } = await supabase
-    .from('purchase_orders')
-    .select('vendor_id')
-    .eq('vendor_name', activeParty)
-    .limit(1);
+  const { data: vendor } = await supabase
+    .from('vendors')
+    .select('id')
+    .eq('party_name', activeParty)
+    .limit(1)
+    .single();
 
-  if (existingVendorData && existingVendorData.length > 0 && existingVendorData[0].vendor_id) {
-    return existingVendorData[0].vendor_id;
-  } else {
-    const { data: allVendors } = await supabase.from('purchase_orders').select('vendor_id');
-    let maxSeq = 0;
-    if (allVendors) {
-      allVendors.forEach(v => {
-        if (v.vendor_id && v.vendor_id.startsWith('VN-')) {
-          const seq = parseInt(v.vendor_id.split('-')[1], 10);
-          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-        }
-      });
-    }
-    return `VN-${String(maxSeq + 1).padStart(3, "0")}`;
+  if (vendor) {
+    return `VN-${String(vendor.id).padStart(3, "0")}`;
   }
+  return "VN-000";
 };
 
 export const insertPurchaseOrder = async (poData) => {
@@ -110,18 +100,20 @@ export const insertPurchaseOrder = async (poData) => {
 export const getOrCreateVendorPortalLink = async (activeParty, currentVendorId, baseUrl) => {
   const { data: vendorRow } = await supabase
     .from("vendors")
-    .select("portal_link")
+    .select("id, portal_link")
     .eq("party_name", activeParty)
     .limit(1)
     .single();
 
-  let dbPortalLink = vendorRow?.portal_link;
+  if (!vendorRow) return "";
+
+  let dbPortalLink = vendorRow.portal_link;
   if (!dbPortalLink) {
-    dbPortalLink = `/vendor-portal/${currentVendorId}`;
+    dbPortalLink = `/vendor-portal/${vendorRow.id}`;
     await supabase
       .from("vendors")
       .update({ portal_link: dbPortalLink })
-      .eq("party_name", activeParty);
+      .eq("id", vendorRow.id);
   }
   return dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
 };
