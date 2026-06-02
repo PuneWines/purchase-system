@@ -616,8 +616,18 @@ const Indent = () => {
             const updatedReceivedItems = { ...(po.received_items || {}) };
             delete updatedReceivedItems[itemId];
 
-            const newTotalQty = Math.max(0, (po.total_order_qty || 0) - (parseFloat(itemData.order_qty) || 0));
-            const newTotalBox = Math.max(0, (po.total_order_box || 0) - (parseFloat(itemData.order_box) || 0));
+            const orderBox = itemData.order_box !== null ? parseFloat(itemData.order_box) : 0;
+            const orderQty = itemData.order_qty !== null ? parseFloat(itemData.order_qty) : 0;
+            const qtyType = orderBox >= 0.90 ? "Box" : "Bottles";
+
+            let newTotalQty = po.total_order_qty || 0;
+            let newTotalBox = po.total_order_box || 0;
+
+            if (qtyType === "Box") {
+              newTotalBox = Math.max(0, newTotalBox - Math.round(orderBox));
+            } else {
+              newTotalQty = Math.max(0, newTotalQty - Math.ceil(orderQty));
+            }
 
             const { error: updPoError } = await supabase
               .from('purchase_orders')

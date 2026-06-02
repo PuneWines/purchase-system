@@ -239,8 +239,11 @@ const PurchaseOrder = () => {
       let totalOrderBox = 0;
 
       itemsForActiveParty.forEach((item) => {
-        totalOrderQty += item.orderQty || 0;
-        totalOrderBox += item.orderBox || 0;
+        if (item.qtyType === "Box") {
+          totalOrderBox += Math.round(item.orderBox || 0);
+        } else {
+          totalOrderQty += Math.ceil(item.orderQty || 0);
+        }
       });
 
       const insertedData = await insertPurchaseOrder({
