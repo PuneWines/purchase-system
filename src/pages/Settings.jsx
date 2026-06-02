@@ -4,7 +4,7 @@ import useVendorStore from "../store/useVendorStore";
 import useCompanyStore from "../store/useCompanyStore";
 import { 
   Plus, Trash2, Edit2, Shield, Settings as SettingsIcon,
-  Search, Copy, Check, Truck, UserCheck, Package, ShoppingBag, AlertCircle, Loader2
+  Search, Copy, Check, Truck, UserCheck, Package, ShoppingBag, AlertCircle, Loader2, X
 } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 import "../styles/Settings.css";
@@ -47,6 +47,7 @@ const Settings = () => {
     contact_name: "",
     contact: "",
     email: "",
+    terms: [],
   });
 
   // Company Form State
@@ -223,6 +224,7 @@ const Settings = () => {
       contact_name: vendor.contact_name || "",
       contact: vendor.contact || "",
       email: vendor.email || "",
+      terms: vendor.terms || [],
     });
     setShowVendorForm(true);
   };
@@ -236,6 +238,7 @@ const Settings = () => {
       contact_name: "",
       contact: "",
       email: "",
+      terms: [],
     });
     setShowVendorForm(true);
   };
@@ -352,6 +355,24 @@ const Settings = () => {
   const handleRemoveTerm = (index) => {
     const newTerms = companyFormData.terms.filter((_, i) => i !== index);
     setCompanyFormData({ ...companyFormData, terms: newTerms });
+  };
+
+  const handleVendorTermChange = (index, value) => {
+    const newTerms = [...(vendorFormData.terms || [])];
+    newTerms[index] = value;
+    setVendorFormData({ ...vendorFormData, terms: newTerms });
+  };
+
+  const handleVendorAddTerm = () => {
+    setVendorFormData({
+      ...vendorFormData,
+      terms: [...(vendorFormData.terms || []), ""]
+    });
+  };
+
+  const handleVendorRemoveTerm = (index) => {
+    const newTerms = (vendorFormData.terms || []).filter((_, i) => i !== index);
+    setVendorFormData({ ...vendorFormData, terms: newTerms });
   };
 
   // --- TRANSPORTER HANDLERS ---
@@ -504,10 +525,18 @@ const Settings = () => {
               </div>
 
               {showForm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
-                    {editingUser ? "📝 Edit User Profile" : "✨ Create New User Account"}
-                  </h3>
+                <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto pt-16">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-6 w-full max-w-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                      {editingUser ? "📝 Edit User Profile" : "✨ Create New User Account"}
+                    </h3>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -596,6 +625,7 @@ const Settings = () => {
                       </button>
                     </div>
                   </form>
+                  </div>
                 </div>
               )}
 
@@ -676,10 +706,18 @@ const Settings = () => {
               </div>
 
               {showVendorForm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
-                    {editingVendor ? "📝 Edit Supplier details" : "✨ Create New Supplier Entry"}
-                  </h3>
+                <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto pt-16">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-6 w-full max-w-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowVendorForm(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                      {editingVendor ? "📝 Edit Supplier details" : "✨ Create New Supplier Entry"}
+                    </h3>
                   <form onSubmit={handleVendorSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -754,6 +792,48 @@ const Settings = () => {
                       />
                     </div>
 
+                    {/* Standard Terms */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <span className="text-xs font-bold text-slate-800">Standard Purchase Terms</span>
+                        <button 
+                          type="button" 
+                          onClick={handleVendorAddTerm}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} /> Add term
+                        </button>
+                      </div>
+
+                      {(!vendorFormData.terms || vendorFormData.terms.length === 0) ? (
+                        <p className="text-slate-500 text-xs font-medium italic">No terms defined for this profile.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {vendorFormData.terms.map((term, index) => (
+                            <div key={index} className="flex gap-2 items-start bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                              <span className="text-xs font-bold text-slate-400 mt-2 shrink-0">{index + 1}.</span>
+                              <textarea
+                                value={term}
+                                onChange={(e) => handleVendorTermChange(index, e.target.value)}
+                                disabled={isVendorSubmitting}
+                                rows={2}
+                                className="w-full text-xs border-0 bg-transparent text-slate-800 font-medium resize-none focus:outline-none p-0"
+                                placeholder="E.g. Payment is net 30 days..."
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleVendorRemoveTerm(index)}
+                                disabled={isVendorSubmitting}
+                                className="p-1 hover:bg-red-50 text-red-600 rounded border border-transparent hover:border-red-200 transition-all shrink-0 cursor-pointer"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex gap-3 pt-3 border-t border-slate-100">
                       <button 
                         type="submit" 
@@ -772,7 +852,8 @@ const Settings = () => {
                     </div>
                   </form>
                 </div>
-              )}
+              </div>
+            )}
 
               {/* Vendors Ledger Table */}
               <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -839,10 +920,18 @@ const Settings = () => {
               </div>
 
               {showCompanyForm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
-                    {editingCompany ? "📝 Edit Company Profile" : "✨ Create Corporate Billing Profile"}
-                  </h3>
+                <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto pt-16">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-6 w-full max-w-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowCompanyForm(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                      {editingCompany ? "📝 Edit Company Profile" : "✨ Create Corporate Billing Profile"}
+                    </h3>
                   <form onSubmit={handleCompanySubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -965,6 +1054,7 @@ const Settings = () => {
                       </button>
                     </div>
                   </form>
+                  </div>
                 </div>
               )}
 
@@ -1039,10 +1129,18 @@ const Settings = () => {
               </div>
 
               {showTransporterForm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
-                    {editingTransporter ? "📝 Edit Transporter Details" : "✨ Add Logistics Partner"}
-                  </h3>
+                <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto pt-16">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-6 w-full max-w-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowTransporterForm(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                      {editingTransporter ? "📝 Edit Transporter Details" : "✨ Add Logistics Partner"}
+                    </h3>
                   <form onSubmit={handleTransporterSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -1086,6 +1184,7 @@ const Settings = () => {
                       </button>
                     </div>
                   </form>
+                  </div>
                 </div>
               )}
 
@@ -1154,10 +1253,18 @@ const Settings = () => {
               </div>
 
               {showReceiverForm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
-                    {editingReceiver ? "📝 Edit Receiver Details" : "✨ Add Stock Receiver Profile"}
-                  </h3>
+                <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto pt-16">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl space-y-6 w-full max-w-2xl relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceiverForm(false)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-base font-bold text-slate-950 border-b border-slate-100 pb-3">
+                      {editingReceiver ? "📝 Edit Receiver Details" : "✨ Add Stock Receiver Profile"}
+                    </h3>
                   <form onSubmit={handleReceiverSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -1201,6 +1308,7 @@ const Settings = () => {
                       </button>
                     </div>
                   </form>
+                  </div>
                 </div>
               )}
 

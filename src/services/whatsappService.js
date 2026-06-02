@@ -584,22 +584,17 @@ export const sendPOConfirmationMessage = async (phoneNumber, vendorName, poNumbe
     const shopName = await resolveShopName(poNumber);
     const finalShopName = shopName || companyName || 'DRINQKART';
 
-    const message = `📩 *Purchase Order Notification*
+    const message = `📩 *Trader - Purchase Order*
 
-Dear *${vendorName}*,
-
+*Trader Name:* ${vendorName}
 *PO Number:* ${poNumber}
 *Shop Name:* ${finalShopName}
 *Total Qty:* ${totalQty}
+*Link:* ${portalLink}
 
-✅ A new purchase order has been generated for you. Please check your Vendor Portal to review the details and submit confirmation.
+Please click on above link to see orders`;
 
-THANKS & REGARDS
-TEAM ${finalShopName}`;
-
-    const success = pdfUrl
-      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
-      : await sendWhatsAppMessage(phoneNumber, message);
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] PO confirmation sent to", phoneNumber);
@@ -640,15 +635,12 @@ You have a new pick-up request from *${finalShopName}*.
 *PO Number:* ${poNumber}
 *Shop Name:* ${finalShopName}
 *Vendor Name:* ${vendorName}
+*Link:* ${portalLink}
 
-✅ Please log in to your Transporter Portal to review details and confirm or reject this pick-up.
+Please click on above link to see details
+`;
 
-THANKS & REGARDS
-TEAM ${finalShopName}`;
-
-    const success = pdfUrl
-      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
-      : await sendWhatsAppMessage(phoneNumber, message);
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Transporter confirmation sent to", phoneNumber);
@@ -688,15 +680,12 @@ A new delivery from *${vendorName}* is on its way to *${finalShopName}*.
 
 *PO Number:* ${poNumber}
 *Shop Name:* ${finalShopName}
+*Link:* ${portalLink}
 
-✅ Please log in to your Receiver Portal to confirm the delivery, verify the quantities of the items received, and submit your report.
+Please click on above link to see details
 
-THANKS & REGARDS
-TEAM ${finalShopName}`;
 
-    const success = pdfUrl
-      ? await sendWhatsAppMediaMessage(phoneNumber, pdfUrl, message)
-      : await sendWhatsAppMessage(phoneNumber, message);
+    const success = await sendWhatsAppMessage(phoneNumber, message);
 
     if (success) {
       console.log("[WhatsApp] Receiver confirmation sent to", phoneNumber);
