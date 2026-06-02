@@ -682,8 +682,7 @@ A new delivery from *${vendorName}* is on its way to *${finalShopName}*.
 *Shop Name:* ${finalShopName}
 *Link:* ${portalLink}
 
-Please click on above link to see details
-
+Please click on above link to see details`;
 
     const success = await sendWhatsAppMessage(phoneNumber, message);
 
