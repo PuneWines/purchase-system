@@ -114,13 +114,17 @@ const TransporterPortal = () => {
       const { data: items, error: itemsError } = await supabase
         .from("indent_items")
         .select("*")
-        .eq("unique_indent_id", po.indent_id);
+        .eq("unique_indent_id", po.indent_id)
+        .eq("approval_status", "approved")
+        .eq("is_excluded", false);
 
       if (itemsError) throw itemsError;
 
-      // Filter in-memory case-insensitively by vendor name
+      // Filter in-memory case-insensitively by vendor name and positive quantity
       const filtered = (items || []).filter(
-        item => item.party_name?.trim().toLowerCase() === po.vendor_name?.trim().toLowerCase()
+        item => 
+          item.party_name?.trim().toLowerCase() === po.vendor_name?.trim().toLowerCase() &&
+          (parseFloat(item.order_qty) || 0) > 0
       );
 
       // Process items to standard shape

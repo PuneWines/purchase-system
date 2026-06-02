@@ -46,7 +46,8 @@ const ReceiverConfirmation = () => {
             .from("indent_items")
             .select("*")
             .eq("unique_indent_id", po.indent_id)
-            .eq("approval_status", "approved"); // fetch approved items for this indent
+            .eq("approval_status", "approved")
+            .eq("is_excluded", false); // fetch approved items for this indent
 
           if (!itemsErr && itemsData) {
             const filtered = itemsData

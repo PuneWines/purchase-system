@@ -819,7 +819,8 @@ const PurchaseOrder = () => {
       const { data: indentData, error: indentError } = await supabase
         .from("indent_items")
         .select("*")
-        .eq("approval_status", "approved");
+        .eq("approval_status", "approved")
+        .eq("is_excluded", false);
 
       // Fetch existing purchase orders
       const { data: poData } = await supabase

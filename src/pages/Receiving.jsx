@@ -85,7 +85,8 @@ const Receiving = () => {
             .from("indent_items")
             .select("*")
             .in("unique_indent_id", indentIds)
-            .eq("approval_status", "approved");
+            .eq("approval_status", "approved")
+            .eq("is_excluded", false);
 
           if (itemsError) throw itemsError;
           setItemsData(items || []);

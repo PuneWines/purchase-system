@@ -308,7 +308,8 @@ const Approval = () => {
   const historyBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
     const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
     // Determine history based on all active (non-excluded) items
-    return shopOk && items.filter(item => !item.is_excluded).every(item => item.approval_status && item.approval_status !== 'pending');
+    const activeItems = items.filter(item => !item.is_excluded);
+    return shopOk && activeItems.length > 0 && activeItems.every(item => item.approval_status && item.approval_status !== 'pending');
   });
 
   const displayedBatches = activeTab === "pending" ? pendingBatches : historyBatches;
@@ -442,7 +443,7 @@ const Approval = () => {
                             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                             border: '1px solid #fca5a5' // Subtle border for definition
                           }}>
-                            {items.length}
+                            {items.filter(item => !item.is_excluded).length}
                           </span>
                         )}
                       </button>
