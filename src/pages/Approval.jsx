@@ -143,24 +143,60 @@ const Approval = () => {
   const fetchApprovals = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("indent_items")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Fetch all indent items paginated
+      let allIndentItems = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("indent_items")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      // Fetch indents to resolve shop_name
-      const { data: indentsData } = await supabase
-        .from("indents")
-        .select("id, shop_name");
+        if (pageError) throw pageError;
+        if (pageData && pageData.length > 0) {
+          allIndentItems = [...allIndentItems, ...pageData];
+          page++;
+          if (pageData.length < pageSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
 
-      const shopMap = (indentsData || []).reduce((acc, ind) => {
+      // Fetch all indents paginated to resolve shop_name
+      let allIndents = [];
+      let indentPage = 0;
+      let indentsHasMore = true;
+
+      while (indentsHasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("indents")
+          .select("id, shop_name")
+          .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
+
+        if (pageError) throw pageError;
+        if (pageData && pageData.length > 0) {
+          allIndents = [...allIndents, ...pageData];
+          indentPage++;
+          if (pageData.length < pageSize) {
+            indentsHasMore = false;
+          }
+        } else {
+          indentsHasMore = false;
+        }
+      }
+
+      const shopMap = (allIndents || []).reduce((acc, ind) => {
         acc[ind.id] = ind.shop_name;
         return acc;
       }, {});
 
-      const enriched = (data || []).map(item => ({
+      const enriched = (allIndentItems || []).map(item => ({
         ...item,
         shop_name: shopMap[item.indent_id] || "Unknown"
       }));
@@ -455,12 +491,12 @@ const Approval = () => {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', backgroundColor: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontWeight: '600', fontSize: '12px' }} title="Approved">
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 0 2px #dcfce7' }}></span>
-                            {items.filter(i => indentStatuses[i.id] === 'approved').length}
+                            {items.filter(i => !i.is_excluded && indentStatuses[i.id] === 'approved').length}
                           </div>
                           <div style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0' }}></div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', fontWeight: '600', fontSize: '12px' }} title="Rejected">
                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 0 2px #fee2e2' }}></span>
-                            {items.filter(i => indentStatuses[i.id] === 'rejected').length}
+                            {items.filter(i => !i.is_excluded && indentStatuses[i.id] === 'rejected').length}
                           </div>
                         </div>
                       </td>
@@ -543,7 +579,7 @@ const Approval = () => {
                     {isLoading ? 'Submitting...' : 'Submit'}
                   </button>
                 )}
-                {groupedApprovals[selectedIndentId]?.some(item => item.is_excluded) && (
+                {activeTab !== 'history' && groupedApprovals[selectedIndentId]?.some(item => item.is_excluded) && (
                   <button
                     onClick={() => setShowExcludedModal(true)}
                     style={{

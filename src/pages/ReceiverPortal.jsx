@@ -138,17 +138,20 @@ const ReceiverPortal = () => {
           orderBox,
           qtyType,
           displayQty,
+          closingQty: row.closing_qty != null ? row.closing_qty : null,
           shopName: row.shop_name || "Unknown"
         };
       });
 
       setPoItems(prev => ({ ...prev, [po.id]: processed }));
 
-      // If PO is not yet submitted, prefill received quantities with orderQty (Match All by default)
+      // Prefill received quantities from transporter's delivered_items if present, else orderQty
       if (!po.receiver_status && !receivedQtys[po.id]) {
+        const savedDelivered = po.delivered_items || {};
         const initialQtys = {};
         processed.forEach(item => {
-          initialQtys[item.id] = item.orderQty;
+          // Use transporter's delivered qty as starting point if available
+          initialQtys[item.id] = savedDelivered[item.id]?.deliveredQty ?? item.orderQty;
         });
         setReceivedQtys(prev => ({ ...prev, [po.id]: initialQtys }));
       }
@@ -172,12 +175,13 @@ const ReceiverPortal = () => {
     }));
   };
 
-  // Quick Action: Match all quantities
-  const handleMatchAll = (poId) => {
+  // Quick Action: Match all – prefill from transporter delivered qty, fallback to orderQty
+  const handleMatchAll = (poId, po) => {
     const items = poItems[poId] || [];
+    const savedDelivered = po?.delivered_items || {};
     const matched = {};
     items.forEach(item => {
-      matched[item.id] = item.orderQty;
+      matched[item.id] = savedDelivered[item.id]?.deliveredQty ?? item.orderQty;
     });
     setReceivedQtys(prev => ({ ...prev, [poId]: matched }));
   };
@@ -437,10 +441,10 @@ const ReceiverPortal = () => {
                               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Item Receipt Ledger</span>
                               <div className="flex gap-2">
                                 <button 
-                                  onClick={() => handleMatchAll(po.id)}
+                                  onClick={() => handleMatchAll(po.id, po)}
                                   className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 rounded text-xs font-bold transition-all cursor-pointer shadow-sm"
                                 >
-                                  Match All
+                                  Match Delivered
                                 </button>
                                 <button 
                                   onClick={() => handleResetAll(po.id)}
@@ -454,59 +458,107 @@ const ReceiverPortal = () => {
                               <table className="w-full text-left border-collapse text-sm text-slate-800">
                                 <thead>
                                   <tr className="bg-slate-50/50 border-b border-slate-200">
-                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-16">S.No</th>
+                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-14">S.No</th>
                                     <th className="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Item Details</th>
                                     <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-24">Order Qty</th>
-                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Delivered Qty</th>
-                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Difference</th>
+                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-28">Closing Qty</th>
+                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Transporter Delivered</th>
+                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Received Qty</th>
+                                    <th className="p-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36">Difference</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {items.map((item, index) => {
                                     const currentQtyVal = (receivedQtys[po.id] || {})[item.id] ?? "";
-                                    const difference = currentQtyVal !== "" ? Number(currentQtyVal) - item.orderQty : 0;
+                                    const transporterDeliveredQty = po.delivered_items?.[item.id]?.deliveredQty;
                                     const traderDecisions = po.trader_item_statuses || {};
                                     const itemDecision = traderDecisions[item.id] || "approved";
                                     const isApprovedByTrader = itemDecision === "approved";
 
+                                    // Difference: receiver qty vs transporter delivered qty (fallback to orderQty)
+                                    // For rejected items, show N/A
+                                    const referenceQty = transporterDeliveredQty ?? item.orderQty;
+                                    const difference = isApprovedByTrader && currentQtyVal !== "" ? Number(currentQtyVal) - referenceQty : null;
+
                                     return (
-                                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                                      <tr
+                                        key={item.id}
+                                        className={`border-b transition-colors ${
+                                          isApprovedByTrader
+                                            ? "border-slate-100 hover:bg-slate-50/50"
+                                            : "border-red-200 bg-red-50/40"
+                                        }`}
+                                      >
                                         <td className="p-3 text-center text-slate-500 font-medium">{index + 1}</td>
                                         <td className="p-3">
-                                          <strong className="text-slate-900 font-semibold">{item.itemName}</strong>
-                                          <div className="text-xs text-slate-500 mt-0.5">
-                                            {item.brandName} • {item.shopName} • {" "}
-                                            <span className={`font-semibold ${isApprovedByTrader ? "text-emerald-600" : "text-red-500"}`}>
-                                              Supplier: {isApprovedByTrader ? "Approved" : "Shortage/Rejected"}
-                                            </span>
+                                          <div className="flex items-start gap-2 flex-wrap">
+                                            <div>
+                                              <strong className={`font-semibold ${ isApprovedByTrader ? "text-slate-900" : "text-red-400 line-through"}`}>
+                                                {item.itemName}
+                                              </strong>
+                                              <div className="text-xs text-slate-500 mt-0.5">
+                                                {item.brandName} • {item.shopName}
+                                              </div>
+                                            </div>
+                                            {!isApprovedByTrader && (
+                                              <span className="shrink-0 bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                                ❌ Rejected by Supplier
+                                              </span>
+                                            )}
                                           </div>
                                         </td>
-                                        <td className="p-3 text-center font-bold text-slate-900">{item.orderQty}</td>
-                                        
+                                        <td className={`p-3 text-center font-bold ${ isApprovedByTrader ? "text-slate-900" : "text-red-300 line-through"}`}>
+                                          {item.orderQty}
+                                        </td>
+
+                                        {/* Closing Qty */}
+                                        <td className="p-3 text-center">
+                                          <span className={`font-semibold ${ isApprovedByTrader ? "text-slate-700" : "text-slate-400"}`}>
+                                            {item.closingQty != null ? item.closingQty : "—"}
+                                          </span>
+                                        </td>
+
+                                        {/* Transporter Delivered Qty – read-only */}
+                                        <td className="p-3 text-center">
+                                          {!isApprovedByTrader ? (
+                                            <span className="text-red-400 text-xs font-bold">Not Dispatched</span>
+                                          ) : transporterDeliveredQty != null ? (
+                                            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-bold">
+                                              {transporterDeliveredQty}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-400 text-xs">—</span>
+                                          )}
+                                        </td>
+
+                                        {/* Receiver Qty – editable (locked at 0 for rejected items) */}
                                         <td className="p-3 text-center">
                                           <input
                                             type="number"
-                                            className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-slate-900 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                            value={currentQtyVal}
-                                            onChange={(e) => handleQtyChange(po.id, item.id, e.target.value)}
+                                            className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                                            value={isApprovedByTrader ? currentQtyVal : 0}
+                                            onChange={(e) => isApprovedByTrader && handleQtyChange(po.id, item.id, e.target.value)}
                                             min="0"
+                                            disabled={!isApprovedByTrader}
                                           />
                                         </td>
-                                        
+
                                         <td className="p-3 text-center">
-                                          {difference === 0 ? (
+                                          {!isApprovedByTrader ? (
+                                            <span className="text-red-400 text-xs font-semibold">N/A</span>
+                                          ) : difference === 0 ? (
                                             <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
                                               Match
                                             </span>
-                                          ) : difference < 0 ? (
+                                          ) : difference !== null && difference < 0 ? (
                                             <span className="bg-red-50 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
                                               {difference} Shortage
                                             </span>
-                                          ) : (
+                                          ) : difference !== null ? (
                                             <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
                                               +{difference} Surplus
                                             </span>
-                                          )}
+                                          ) : null}
                                         </td>
                                       </tr>
                                     );

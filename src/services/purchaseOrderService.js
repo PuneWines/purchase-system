@@ -22,26 +22,78 @@ export const fetchNextPoNumber = async () => {
 };
 
 export const fetchPageData = async () => {
-  // Fetch approved indent items
-  const { data: indentData, error: indentError } = await supabase
-    .from("indent_items")
-    .select("*")
-    .eq("approval_status", "approved")
-    .eq("is_excluded", false);
+  const pageSize = 1000;
 
-  if (indentError) throw indentError;
+  // Fetch approved indent items paginated
+  let indentData = [];
+  let indentPage = 0;
+  let indentHasMore = true;
 
-  // Fetch existing purchase orders
-  const { data: poData, error: poError } = await supabase
-    .from("purchase_orders")
-    .select("indent_id, vendor_name");
-  if (poError) throw poError;
+  while (indentHasMore) {
+    const { data: pageData, error: indentError } = await supabase
+      .from("indent_items")
+      .select("*")
+      .eq("approval_status", "approved")
+      .eq("is_excluded", false)
+      .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
 
-  // Fetch indents to resolve shop_name
-  const { data: indentsData, error: indentsError } = await supabase
-    .from("indents")
-    .select("id, shop_name");
-  if (indentsError) throw indentsError;
+    if (indentError) throw indentError;
+    if (pageData && pageData.length > 0) {
+      indentData = [...indentData, ...pageData];
+      indentPage++;
+      if (pageData.length < pageSize) {
+        indentHasMore = false;
+      }
+    } else {
+      indentHasMore = false;
+    }
+  }
+
+  // Fetch existing purchase orders paginated
+  let poData = [];
+  let poPage = 0;
+  let poHasMore = true;
+
+  while (poHasMore) {
+    const { data: pageData, error: poError } = await supabase
+      .from("purchase_orders")
+      .select("indent_id, vendor_name")
+      .range(poPage * pageSize, (poPage + 1) * pageSize - 1);
+
+    if (poError) throw poError;
+    if (pageData && pageData.length > 0) {
+      poData = [...poData, ...pageData];
+      poPage++;
+      if (pageData.length < pageSize) {
+        poHasMore = false;
+      }
+    } else {
+      poHasMore = false;
+    }
+  }
+
+  // Fetch indents to resolve shop_name paginated
+  let indentsData = [];
+  let indentsPage = 0;
+  let indentsHasMore = true;
+
+  while (indentsHasMore) {
+    const { data: pageData, error: indentsError } = await supabase
+      .from("indents")
+      .select("id, shop_name")
+      .range(indentsPage * pageSize, (indentsPage + 1) * pageSize - 1);
+
+    if (indentsError) throw indentsError;
+    if (pageData && pageData.length > 0) {
+      indentsData = [...indentsData, ...pageData];
+      indentsPage++;
+      if (pageData.length < pageSize) {
+        indentsHasMore = false;
+      }
+    } else {
+      indentsHasMore = false;
+    }
+  }
 
   // Fetch vendors
   const { data: vendorsData, error: vendorsError } = await supabase

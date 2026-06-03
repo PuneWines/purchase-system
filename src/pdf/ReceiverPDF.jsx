@@ -219,12 +219,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   colSNo: { width: "5%", textAlign: "center" },
-  colShopName: { width: "15%" },
-  colItemName: { width: "30%" },
-  colClosingStock: { width: "15%", textAlign: "center" },
-  colBoxes: { width: "15%", textAlign: "center" },
+  colShopName: { width: "13%" },
+  colItemName: { width: "27%" },
+  colClosingStock: { width: "13%", textAlign: "center" },
+  colDeliveredQty: { width: "13%", textAlign: "center" },
+  colBoxes: { width: "13%", textAlign: "center" },
   colBottles: { width: "10%", textAlign: "center" },
-  colQtyType: { width: "10%", textAlign: "center" },
+  colQtyType: { width: "6%", textAlign: "center" },
 });
 
 const ReceiverPDF = ({
@@ -346,6 +347,7 @@ const ReceiverPDF = ({
             <Text style={[styles.tableHeaderCell, styles.colShopName]}>Shop Name</Text>
             <Text style={[styles.tableHeaderCell, styles.colItemName]}>Item Name</Text>
             <Text style={[styles.tableHeaderCell, styles.colClosingStock]}>Closing Stock</Text>
+            <Text style={[styles.tableHeaderCell, styles.colDeliveredQty]}>Delivered Qty</Text>
             <Text style={[styles.tableHeaderCell, styles.colBoxes]}>Order Qty (Boxes)</Text>
             <Text style={[styles.tableHeaderCell, styles.colBottles]}>Order Qty (Bottles)</Text>
             <Text style={[styles.tableHeaderCell, styles.colQtyType]}>Qty Type</Text>
@@ -366,6 +368,9 @@ const ReceiverPDF = ({
                 </Text>
                 <Text style={[styles.tableCell, styles.colClosingStock]}>
                   {item.closingQty != null ? item.closingQty : "—"}
+                </Text>
+                <Text style={[styles.tableCell, styles.colDeliveredQty]}>
+                  {item.deliveredQty != null ? item.deliveredQty : "—"}
                 </Text>
                 <Text style={[styles.tableCell, styles.colBoxes, item.qtyType === "Box" ? styles.tableCellBold : {}]}>
                   {item.qtyType === "Box" ? item.displayQty : "—"}

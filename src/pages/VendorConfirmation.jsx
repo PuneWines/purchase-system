@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
-import { sendTransporterConfirmationMessage } from "../services/whatsappService";
 import "../styles/VendorConfirmation.css";
 
 const VendorConfirmation = () => {
@@ -109,52 +108,7 @@ const VendorConfirmation = () => {
 
       if (error) throw error;
       
-      // If vendor confirmed, trigger the correct WhatsApp flow
-      if (status === "yes") {
-        const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-        
-        if (isKunalShop) {
-          // Bypass transporter completely and send directly to receiver
-          if (poData.receiver_number) {
-            const confirmLink = `${baseUrl}/receiver-confirmation/${id}`;
-            let formattedPhone = poData.receiver_number.replace(/\D/g, "");
-            if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-
-            import("../services/whatsappService").then(({ sendReceiverConfirmationMessage }) => {
-              sendReceiverConfirmationMessage(
-                formattedPhone,
-                poData.po_number,
-                confirmLink,
-                "DRINQKART",
-                poData.vendor_name,
-                poData.receiver_pdf_url || poData.trader_pdf_url
-              ).then(res => {
-                if (!res.success) {
-                  console.warn("Receiver message failed:", res.error);
-                }
-              });
-            });
-          }
-        } else if (poData.transporter_number) {
-          // Regular transporter confirmation flow
-          const confirmLink = `${baseUrl}/transporter-confirmation/${id}`;
-          let formattedPhone = poData.transporter_number.replace(/\D/g, "");
-          if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-
-          sendTransporterConfirmationMessage(
-            formattedPhone,
-            poData.po_number,
-            confirmLink,
-            "DRINQKART",
-            poData.vendor_name,
-            poData.receiver_pdf_url || poData.trader_pdf_url
-          ).then(res => {
-            if (!res.success) {
-              console.warn("Transporter message failed:", res.error);
-            }
-          });
-        }
-      }
+      // WhatsApp notifications removed to avoid spammed alerts
       
       // Fetch latest data to display on success page
       const { data: updatedData } = await supabase

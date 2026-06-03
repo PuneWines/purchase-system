@@ -22,7 +22,7 @@ import {
   getOrCreateReceiverPortalLink
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
-import { sendPOConfirmationMessage, sendTransporterConfirmationMessage } from "../services/whatsappService";
+import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
 
 // Utilities
 import { transformActivePartyItems } from "../utils/poTransformer";
@@ -318,6 +318,23 @@ const PurchaseOrder = () => {
             activeParty,
             traderUrl
           ).then(res => ({ role: "Transporter", success: res.success, error: res.error }))
+        );
+      }
+
+      // 3. Send Receiver Delivery Alert to Receiver via their permanent portal
+      if (selectedReceiver && insertedPoId && receiverPortalLink) {
+        let formattedPhone = selectedReceiver.replace(/\D/g, "");
+        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+
+        whatsappPromises.push(
+          sendReceiverConfirmationMessage(
+            formattedPhone,
+            nextPoNumber,
+            receiverPortalLink,
+            activeCompany?.name || COMPANY.name,
+            activeParty,
+            traderUrl
+          ).then(res => ({ role: "Receiver", success: res.success, error: res.error }))
         );
       }
 

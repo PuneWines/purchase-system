@@ -207,14 +207,13 @@ const Indent = () => {
   const fetchSubmittedHistory = async () => {
     setIsLoadingHistory(true);
     try {
-      const { data, error } = await supabase
+      const { data: indents, error } = await supabase
         .from("indents")
         .select(`
           id,
           shop_name,
           status,
-          created_at,
-          indent_items ( id, is_excluded )
+          created_at
         `)
         .order('created_at', { ascending: false });
 
@@ -223,11 +222,54 @@ const Indent = () => {
         throw error;
       }
 
-      const historyData = (data || []).map(row => ({
-        ...row,
-        itemCount: row.indent_items ? row.indent_items.filter(i => !i.is_excluded).length : 0,
-        excludedCount: row.indent_items ? row.indent_items.filter(i => i.is_excluded).length : 0
-      }));
+      if (!indents || indents.length === 0) {
+        setSubmittedHistory([]);
+        return;
+      }
+
+      // Fetch all indent items for these indents, paginated to bypass the 1000-row limit
+      const indentIds = indents.map(indent => indent.id);
+      let allItems = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("indent_items")
+          .select("indent_id, is_excluded")
+          .in("indent_id", indentIds)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (pageError) throw pageError;
+        if (pageData && pageData.length > 0) {
+          allItems = [...allItems, ...pageData];
+          page++;
+          if (pageData.length < pageSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // Group items by indent_id
+      const itemsByIndent = allItems.reduce((acc, item) => {
+        if (!acc[item.indent_id]) {
+          acc[item.indent_id] = [];
+        }
+        acc[item.indent_id].push(item);
+        return acc;
+      }, {});
+
+      const historyData = indents.map(row => {
+        const items = itemsByIndent[row.id] || [];
+        return {
+          ...row,
+          itemCount: items.filter(i => !i.is_excluded).length,
+          excludedCount: items.filter(i => i.is_excluded).length
+        };
+      });
       setSubmittedHistory(historyData);
     } catch (error) {
       console.error("Error fetching history:", error);
@@ -497,14 +539,31 @@ const Indent = () => {
   const handleViewSubmission = async (history) => {
     setSelectedSubmission(history);
     try {
-      const { data, error } = await supabase
-        .from('indent_items')
-        .select('*')
-        .eq('indent_id', history.id)
-        .eq('is_excluded', false);
+      let allItems = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setSelectedSubmissionItems(data || []);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('indent_items')
+          .select('*')
+          .eq('indent_id', history.id)
+          .eq('is_excluded', false)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allItems = [...allItems, ...data];
+          page++;
+          if (data.length < pageSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      setSelectedSubmissionItems(allItems);
     } catch (error) {
       console.error("Error fetching details:", error);
       addToast("Failed to load submission details.", "error");
@@ -524,14 +583,31 @@ const Indent = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
-      const { data: items, error: itemsError } = await supabase
-        .from('indent_items')
-        .select('unique_indent_id')
-        .eq('indent_id', indentId);
+      let allItems = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (itemsError) throw itemsError;
+      while (hasMore) {
+        const { data: items, error: itemsError } = await supabase
+          .from('indent_items')
+          .select('unique_indent_id')
+          .eq('indent_id', indentId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      const uniqueIndentIds = [...new Set((items || []).map(i => i.unique_indent_id).filter(Boolean))];
+        if (itemsError) throw itemsError;
+        if (items && items.length > 0) {
+          allItems = [...allItems, ...items];
+          page++;
+          if (items.length < pageSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const uniqueIndentIds = [...new Set((allItems || []).map(i => i.unique_indent_id).filter(Boolean))];
 
       if (uniqueIndentIds.length > 0) {
         const { error: poError } = await supabase
@@ -651,12 +727,31 @@ const Indent = () => {
       addToast("Successfully deleted item from indent.", "success");
 
       if (selectedSubmission?.id === indentId) {
-        const { data: refreshedItems } = await supabase
-          .from('indent_items')
-          .select('*')
-          .eq('indent_id', indentId)
-          .eq('is_excluded', false);
-        setSelectedSubmissionItems(refreshedItems || []);
+        let allRefreshed = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data: refreshedItems, error: refError } = await supabase
+            .from('indent_items')
+            .select('*')
+            .eq('indent_id', indentId)
+            .eq('is_excluded', false)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+
+          if (refError) throw refError;
+          if (refreshedItems && refreshedItems.length > 0) {
+            allRefreshed = [...allRefreshed, ...refreshedItems];
+            page++;
+            if (refreshedItems.length < pageSize) {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+        setSelectedSubmissionItems(allRefreshed || []);
       }
 
       fetchSubmittedHistory();

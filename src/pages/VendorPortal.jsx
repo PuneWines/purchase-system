@@ -6,10 +6,6 @@ import {
   ChevronDown, ChevronUp, Check, X, Calendar, 
   Hash, MessageSquare, ArrowRight, ShoppingBag 
 } from "lucide-react";
-import { 
-  sendTransporterConfirmationMessage, 
-  sendReceiverConfirmationMessage 
-} from "../services/whatsappService";
 import html2pdf from "html2pdf.js";
 import "../styles/PurchaseOrder.css"; // Kept solely for off-screen PDF styling
 
@@ -354,84 +350,7 @@ const VendorPortal = () => {
         console.error("PDF Regeneration failed, continuing with WhatsApp notifications:", pdfErr);
       }
 
-      // 4. Send WhatsApp Messages
-      const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
-
-      if (isKunalShop) {
-        // Receiver Flow
-        if (po.receiver_number) {
-          // Fetch or generate receiver permanent portal link
-          const { data: receiverRow } = await supabase
-            .from("receivers")
-            .select("*")
-            .eq("contact_number", po.receiver_number)
-            .limit(1)
-            .single();
-
-          let rPortalLink = "";
-          if (receiverRow) {
-            let dbPortalLink = receiverRow.portal_link;
-            if (!dbPortalLink) {
-              dbPortalLink = `/receiver-portal/${receiverRow.id}`;
-              try {
-                await supabase
-                  .from("receivers")
-                  .update({ portal_link: dbPortalLink })
-                  .eq("id", receiverRow.id);
-              } catch (err) {
-                console.warn("Could not update receiver portal_link in vendor submit:", err);
-              }
-            }
-            rPortalLink = dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
-          } else {
-            rPortalLink = `${baseUrl}/receiver-confirmation/${poId}`;
-          }
-
-          let formattedPhone = po.receiver_number.replace(/\D/g, "");
-          if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-
-          await sendReceiverConfirmationMessage(
-            formattedPhone,
-            po.po_number,
-            rPortalLink,
-            COMPANY.name,
-            po.vendor_name,
-            po.receiver_pdf_url || finalTraderPdfUrl
-          );
-        }
-      } else if (po.transporter_number) {
-        // Transporter Flow — Fetch or generate permanent portal link
-        const { data: transporterRow } = await supabase
-          .from("transporters")
-          .select("*")
-          .eq("contact_number", po.transporter_number)
-          .limit(1)
-          .single();
-
-        if (transporterRow) {
-          let dbPortalLink = transporterRow.portal_link;
-          if (!dbPortalLink) {
-            dbPortalLink = `/transporter-portal/${transporterRow.id}`;
-            await supabase
-              .from("transporters")
-              .update({ portal_link: dbPortalLink })
-              .eq("id", transporterRow.id);
-          }
-          const tPortalLink = dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
-
-          let formattedPhone = po.transporter_number.replace(/\D/g, "");
-          if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-
-          await sendTransporterConfirmationMessage(
-            formattedPhone,
-            po.po_number,
-            tPortalLink,
-            COMPANY.name,
-            po.vendor_name,
-            finalTraderPdfUrl
-          );
-        }
-      }
+      // 4. Send WhatsApp Messages (Removed to avoid double/spammed notifications)
 
       setSuccessPoIds(prev => ({ ...prev, [poId]: true }));
       setExpandedPoId(null);

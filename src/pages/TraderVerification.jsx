@@ -19,19 +19,38 @@ const TraderVerification = () => {
         .order("created_at", { ascending: false });
 
       if (poData) {
-        // Fetch indents and indent_items to resolve shop_name
-        const { data: indents } = await supabase.from("indents").select("id, shop_name");
-        const { data: items } = await supabase.from("indent_items").select("indent_id, unique_indent_id");
+        // Collect all unique indent_ids from the POs
+        const uniqueIndentIds = [...new Set(poData.map(po => po.indent_id).filter(Boolean))];
 
-        const indentMap = (indents || []).reduce((acc, ind) => {
-          acc[ind.id] = ind.shop_name;
-          return acc;
-        }, {});
+        // Fetch only the indent_items rows that match these unique_indent_ids
+        const { data: items } = uniqueIndentIds.length > 0
+          ? await supabase
+              .from("indent_items")
+              .select("indent_id, unique_indent_id")
+              .in("unique_indent_id", uniqueIndentIds)
+          : { data: [] };
 
+        // Build map: unique_indent_id (text) → indent_id (UUID)
         const itemMap = (items || []).reduce((acc, item) => {
           if (item.unique_indent_id && item.indent_id) {
             acc[item.unique_indent_id] = item.indent_id;
           }
+          return acc;
+        }, {});
+
+        // Collect the parent indent UUIDs we actually need
+        const parentIndentIds = [...new Set(Object.values(itemMap))];
+
+        // Fetch only the indents we need
+        const { data: indents } = parentIndentIds.length > 0
+          ? await supabase
+              .from("indents")
+              .select("id, shop_name")
+              .in("id", parentIndentIds)
+          : { data: [] };
+
+        const indentMap = (indents || []).reduce((acc, ind) => {
+          acc[ind.id] = ind.shop_name;
           return acc;
         }, {});
 
