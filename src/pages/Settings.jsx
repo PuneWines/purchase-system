@@ -115,10 +115,10 @@ const Settings = () => {
     { key: "indent", label: "Indent" },
     { key: "approval", label: "Approval" },
     { key: "po", label: "Purchase Order" },
+    { key: "po_history", label: "PO History" },
     { key: "trader_verification", label: "Trader Verification" },
     { key: "transporter_verification", label: "Transporter Verification" },
     { key: "receiving", label: "Receiving" },
-    { key: "master_item", label: "Master Items" },
     { key: "setting", label: "Settings" },
   ];
 

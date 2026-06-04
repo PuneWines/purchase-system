@@ -201,3 +201,14 @@ export const getOrCreateReceiverPortalLink = async (selectedReceiver, receivers,
   }
   return dbPortalLink.startsWith("http") ? dbPortalLink : `${baseUrl}${dbPortalLink}`;
 };
+
+export const excludeIndentItems = async (ids, reason) => {
+  const { data, error } = await supabase
+    .from("indent_items")
+    .update({ is_excluded: true, exclusion_reason: reason })
+    .in("id", ids)
+    .select();
+
+  if (error) throw error;
+  return data;
+};

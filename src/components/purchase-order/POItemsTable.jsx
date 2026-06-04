@@ -1,6 +1,7 @@
 import React from "react";
+import { Trash2 } from "lucide-react";
 
-const POItemsTable = ({ partyName, items = [], isReceiver }) => {
+const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem }) => {
   const orderQtyRows = items;
 
   const totalBoxes = orderQtyRows
@@ -33,6 +34,7 @@ const POItemsTable = ({ partyName, items = [], isReceiver }) => {
               <th className="po-text-center">Order Qty (Boxes)</th>
               <th className="po-text-center">Order Qty (Bottles)</th>
               <th className="po-text-center">Qty Type</th>
+              {!isReceiver && onRemoveItem && <th className="po-text-center">Action</th>}
             </>
           )}
         </tr>
@@ -72,6 +74,31 @@ const POItemsTable = ({ partyName, items = [], isReceiver }) => {
                     <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
                       {item.qtyType || "—"}
                     </td>
+                    {!isReceiver && onRemoveItem && (
+                      <td className="po-text-center">
+                        <button
+                          onClick={() => onRemoveItem(item.id)}
+                          className="po-item-delete-btn"
+                          title="Remove item"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
                   </>
                 )}
               </tr>
@@ -84,6 +111,7 @@ const POItemsTable = ({ partyName, items = [], isReceiver }) => {
                 <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBoxes}</td>
                 <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBottles}</td>
                 <td className="po-text-center" style={{ padding: '10px 16px' }}></td>
+                {!isReceiver && onRemoveItem && <td className="po-text-center" style={{ padding: '10px 16px' }}></td>}
               </tr>
             )}
           </>

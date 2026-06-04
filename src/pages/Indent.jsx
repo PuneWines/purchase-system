@@ -177,6 +177,19 @@ const Indent = () => {
       return [];
     }
   });
+  const [duplicateCount, setDuplicateCount] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('indent_duplicateCount');
+      return saved ? JSON.parse(saved) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('indent_duplicateCount', JSON.stringify(duplicateCount));
+  }, [duplicateCount]);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const { toasts, addToast, removeToast } = useToast();
@@ -389,13 +402,15 @@ const Indent = () => {
     const fLiquorType = liquorTypeIdx !== -1 ? liquorTypeIdx : (headers.length > 11 ? 11 : -1);
 
     const records = [];
+    let duplicateCount = 0;
+
     for (let i = headerRowIdx + 1; i < allRows.length; i++) {
       const row = allRows[i].map(c => String(c ?? '').trim());
       const itemVal = fItemName !== -1 ? row[fItemName] : '';
       const brandVal = fBrandName !== -1 ? row[fBrandName] : '';
       if (!itemVal && !brandVal) continue;
 
-      records.push({
+      const newRecord = {
         itemName: itemVal || brandVal,
         brandName: brandVal || itemVal,
         partyName: fPartyName !== -1 ? (row[fPartyName] || '') : '',
@@ -409,7 +424,24 @@ const Indent = () => {
           return parsed < 0 ? 0 : parsed;
         })(),
         bcs: bcsIdx !== -1 && row[bcsIdx] ? parseFloat(row[bcsIdx]) : null,
-      });
+      };
+
+      const isDuplicate = records.some(r => 
+        r.itemName.toLowerCase() === newRecord.itemName.toLowerCase() &&
+        r.brandName.toLowerCase() === newRecord.brandName.toLowerCase() &&
+        r.partyName.toLowerCase() === newRecord.partyName.toLowerCase() &&
+        r.mls.toLowerCase() === newRecord.mls.toLowerCase() &&
+        r.liquorType.toLowerCase() === newRecord.liquorType.toLowerCase() &&
+        Object.is(r.qtyOut, newRecord.qtyOut) &&
+        Object.is(r.closingQty, newRecord.closingQty) &&
+        Object.is(r.bcs, newRecord.bcs)
+      );
+
+      if (isDuplicate) {
+        duplicateCount++;
+      } else {
+        records.push(newRecord);
+      }
     }
 
     setTableData(() => {
@@ -435,6 +467,9 @@ const Indent = () => {
     setShowModal(false);
     setUploadStep(1);
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setDuplicateCount(duplicateCount);
+    addToast("File loaded successfully.", "success");
   };
 
   const handleFileUpload = (e) => {
@@ -899,7 +934,9 @@ const Indent = () => {
 
       addToast(`Successfully submitted ${itemsPayload.length} records to Supabase!`, "success");
       setTableData([]);
+      setDuplicateCount(0);
       sessionStorage.removeItem('indent_tableData');
+      sessionStorage.removeItem('indent_duplicateCount');
       fetchSubmittedHistory();
     } catch (error) {
       console.error("Error submitting indent data:", error);
@@ -934,6 +971,9 @@ const Indent = () => {
             <StatPill label="Items" value={stats.totalItems} icon={Database} color="border-blue-200 text-blue-600" />
             <StatPill label="Active" value={stats.activeItems} icon={TrendingUp} color="border-green-200 text-green-600" />
             <StatPill label="Excluded" value={stats.excludedItems} icon={TrendingDown} color="border-red-200 text-red-600" />
+            {duplicateCount > 0 && (
+              <StatPill label="Duplicates Removed" value={duplicateCount} icon={AlertTriangle} color="border-amber-200 text-amber-600" />
+            )}
             <StatPill label="Shop" value={selectedShop || 'Not Selected'} icon={Package} color="border-purple-200 text-purple-600" />
           </div>
         )}
@@ -967,7 +1007,9 @@ const Indent = () => {
               <button
                 onClick={() => {
                   setTableData([]);
+                  setDuplicateCount(0);
                   sessionStorage.removeItem('indent_tableData');
+                  sessionStorage.removeItem('indent_duplicateCount');
                   addToast("Data cleared successfully", "success");
                 }}
                 className="flex items-center gap-2 bg-white border border-[#e2e8f0] hover:bg-[#fef2f2] hover:border-[#fecaca] text-[#ef4444] px-4 py-2 rounded-lg font-semibold transition-all text-sm"
@@ -1404,10 +1446,13 @@ const Indent = () => {
       {tableData.length > 0 && (
         <div className="sticky bottom-0 z-40 bg-white border-t border-[#e2e8f0] shadow-lg -mx-4 md:-mx-6 lg:-mx-8 -mb-6 mt-8">
           <div className="px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <span className="text-sm text-[#64748b]">Items: <strong className="text-[#0f172a]">{stats.totalItems}</strong></span>
               <span className="text-sm text-[#64748b]">Active: <strong className="text-[#10b981]">{stats.activeItems}</strong></span>
               <span className="text-sm text-[#64748b]">Excluded: <strong className="text-[#ef4444]">{stats.excludedItems}</strong></span>
+              {duplicateCount > 0 && (
+                <span className="text-sm text-[#64748b]">Duplicates Removed: <strong className="text-[#d97706]">{duplicateCount}</strong></span>
+              )}
             </div>
             <button
               className="flex items-center gap-2 bg-gradient-to-r from-[#4f46e5] to-[#4338ca] hover:from-[#4338ca] hover:to-[#3730a3] text-white px-5 py-2 rounded-lg font-semibold shadow-md transition-all text-sm"

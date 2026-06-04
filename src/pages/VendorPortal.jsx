@@ -225,15 +225,9 @@ const VendorPortal = () => {
     const poId = po.id;
     setFormErrors(prev => ({ ...prev, [poId]: "" }));
 
-    const tpNum = tpNumbers[poId]?.trim();
     const dDate = dispatchDates[poId];
     const rem = remarks[poId]?.trim() || "";
     const decisions = itemStatuses[poId] || {};
-
-    if (!tpNum) {
-      setFormErrors(prev => ({ ...prev, [poId]: "TP Number is mandatory to confirm the PO." }));
-      return;
-    }
 
     if (!dDate) {
       setFormErrors(prev => ({ ...prev, [poId]: "Expected Dispatch Date is required." }));
@@ -249,7 +243,6 @@ const VendorPortal = () => {
 
       const updatePayload = {
         trader_status: "yes",
-        tp_number: tpNum,
         trader_item_statuses: decisions,
         dispatch_date: dDate,
         remarks: rem
@@ -291,7 +284,7 @@ const VendorPortal = () => {
         setPdfData({
           po,
           items,
-          tpNum,
+          tpNum: po.tp_number || "",
           dDate,
           remarks: rem,
           decisions,
@@ -621,34 +614,18 @@ const VendorPortal = () => {
                                 </div>
                               )}
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                    <Hash size={15} className="text-slate-400" /> TP Number *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    required
-                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
-                                    placeholder="Enter TP Number"
-                                    value={tpNumbers[po.id] || ""}
-                                    onChange={(e) => setTpNumbers(prev => ({ ...prev, [po.id]: e.target.value }))}
-                                  />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                    <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date *
-                                  </label>
-                                  <input
-                                    type="date"
-                                    required
-                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
-                                    value={dispatchDates[po.id] || ""}
-                                    onChange={(e) => setDispatchDates(prev => ({ ...prev, [po.id]: e.target.value }))}
-                                    min={new Date().toISOString().split("T")[0]}
-                                  />
-                                </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date *
+                                </label>
+                                <input
+                                  type="date"
+                                  required
+                                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
+                                  value={dispatchDates[po.id] || ""}
+                                  onChange={(e) => setDispatchDates(prev => ({ ...prev, [po.id]: e.target.value }))}
+                                  min={new Date().toISOString().split("T")[0]}
+                                />
                               </div>
 
                               <div className="space-y-1.5">

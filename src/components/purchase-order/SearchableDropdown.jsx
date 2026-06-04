@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ChevronDown, Check } from "lucide-react";
+import { Search, ChevronDown, Check, Trash2 } from "lucide-react";
 
-const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
+const SearchableDropdown = ({ options, value, onChange, placeholder, onDeleteOption }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
@@ -83,10 +83,37 @@ const SearchableDropdown = ({ options, value, onChange, placeholder }) => {
                   if (value !== option) e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
                   {option}
                 </span>
-                {value === option && <Check size={14} color="#0284c7" style={{ minWidth: '14px' }} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {value === option && <Check size={14} color="#0284c7" style={{ minWidth: '14px' }} />}
+                  {onDeleteOption && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteOption(option);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        borderRadius: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      title="Remove vendor from selection"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             )) : (
               <div style={{ padding: '12px', fontSize: '0.875rem', color: '#94a3b8', textAlign: 'center' }}>

@@ -12,13 +12,13 @@ import {
   UserCheck,
   Truck,
   Inbox,
-  ClipboardList,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Zap,
   Store,
+  History,
 } from "lucide-react";
 import "../styles/Sidebar.css";
 
@@ -36,6 +36,7 @@ const menuGroups = [
       { key: "indent", label: "Indent", icon: <FileText size={18} />, path: "/indent" },
       { key: "approval", label: "Approval", icon: <CheckSquare size={18} />, path: "/approval" },
       { key: "po", label: "PO", icon: <Package size={18} />, path: "/po" },
+      { key: "po_history", label: "PO History", icon: <History size={18} />, path: "/po-history" },
     ],
   },
   {
@@ -49,7 +50,6 @@ const menuGroups = [
   {
     label: "Admin",
     items: [
-      { key: "master_item", label: "Master Items", icon: <ClipboardList size={18} />, path: "/master_item" },
       { key: "setting", label: "Settings", icon: <Settings size={18} />, path: "/setting" },
     ],
   },

@@ -23,7 +23,9 @@ const PurchaseOrderPreview = ({
   setSelectedTransporter,
   selectedReceiver,
   setSelectedReceiver,
-  shippingError
+  shippingError,
+  onRemoveItem,
+  onDeleteVendor
 }) => {
   const isKunalShop = items.some(
     item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL"
@@ -44,6 +46,7 @@ const PurchaseOrderPreview = ({
           partyName={partyName}
           onPartyChange={onPartyChange}
           vendorDetails={vendorDetails}
+          onDeleteVendor={onDeleteVendor}
         />
         <POShipToBox companyInfo={companyInfo} />
       </div>
@@ -52,6 +55,7 @@ const PurchaseOrderPreview = ({
         partyName={partyName}
         items={items}
         isReceiver={false}
+        onRemoveItem={onRemoveItem}
       />
 
       <div className="po-footer-section">

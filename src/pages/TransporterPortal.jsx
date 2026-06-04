@@ -4,7 +4,8 @@ import { supabase } from "../../utils/supabase";
 import { 
   FileText, CheckCircle2, Loader2, AlertCircle, 
   ChevronDown, ChevronUp, Check, X, Calendar, 
-  MessageSquare, Truck, ArrowRight, UserCheck 
+  MessageSquare, Truck, ArrowRight, UserCheck,
+  Hash
 } from "lucide-react";
 
 const COMPANY = {
@@ -28,6 +29,7 @@ const TransporterPortal = () => {
   // Form input states mapped by poId
   const [pickupDates, setPickupDates] = useState({});
   const [remarks, setRemarks] = useState({});
+  const [tpNumbers, setTpNumbers] = useState({});
   
   // Delivered quantity per item: { [poId]: { [itemId]: number | "" } }
   const [deliveredQtys, setDeliveredQtys] = useState({});
@@ -70,15 +72,18 @@ const TransporterPortal = () => {
       // Initialize form fields for POs
       const newPickupDates = {};
       const newRemarks = {};
+      const newTpNumbers = {};
 
       pos?.forEach(po => {
         // Prefill pickup date from trader dispatch_date if set, or existing transporter pickup_date
         newPickupDates[po.id] = po.pickup_date || po.dispatch_date || "";
         newRemarks[po.id] = po.transporter_remarks || "";
+        newTpNumbers[po.id] = po.tp_number || "";
       });
 
       setPickupDates(prev => ({ ...newPickupDates, ...prev }));
       setRemarks(prev => ({ ...newRemarks, ...prev }));
+      setTpNumbers(prev => ({ ...newTpNumbers, ...prev }));
 
     } catch (err) {
       console.error("Error loading transporter portal data:", err);
@@ -184,6 +189,12 @@ const TransporterPortal = () => {
 
     const pDate = pickupDates[poId];
     const rem = remarks[poId]?.trim() || "";
+    const tpNum = tpNumbers[poId]?.trim() || "";
+
+    if (status === "yes" && !tpNum) {
+      setFormErrors(prev => ({ ...prev, [poId]: "TP Number is mandatory to confirm pickup." }));
+      return;
+    }
 
     if (status === "yes" && !pDate) {
       setFormErrors(prev => ({ ...prev, [poId]: "Please specify a Pickup Date." }));
@@ -214,7 +225,8 @@ const TransporterPortal = () => {
         transporter_status: status,
         pickup_date: status === "yes" ? pDate : null,
         transporter_remarks: rem,
-        delivered_items: status === "yes" ? deliveredItemsJSON : null
+        delivered_items: status === "yes" ? deliveredItemsJSON : null,
+        tp_number: status === "yes" ? tpNum : po.tp_number
       };
 
       // Perform DB Update
@@ -309,7 +321,7 @@ const TransporterPortal = () => {
               
               // Trader verification states
               const hasTraderSubmitted = po.trader_status === "yes";
-              const isReadyForApproval = hasTraderSubmitted && po.tp_number && po.tp_number.trim() !== "";
+              const isReadyForApproval = hasTraderSubmitted;
               const traderItemDecisions = po.trader_item_statuses || {};
               
               const items = poItems[po.id] || [];
@@ -398,10 +410,6 @@ const TransporterPortal = () => {
                               </h4>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-0.5">
-                                  <span className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider block">TP Number</span>
-                                  <div className="text-emerald-950 font-bold text-base">{po.tp_number || "N/A (Pending)"}</div>
-                                </div>
-                                <div className="space-y-0.5">
                                   <span className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider block">Expected Dispatch Date</span>
                                   <div className="text-emerald-950 font-bold text-base">
                                     {new Date(po.dispatch_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
@@ -422,7 +430,7 @@ const TransporterPortal = () => {
                                 Awaiting Supplier Dispatch Details
                               </h4>
                               <p className="text-xs text-amber-700 max-w-md leading-relaxed">
-                                The supplier ({po.vendor_name}) has not yet verified the TP number and dispatch details. You will be notified via WhatsApp as soon as they submit, and pick-up actions will be unlocked here.
+                                The supplier ({po.vendor_name}) has not yet verified the dispatch details. You will be notified via WhatsApp as soon as they submit, and pick-up actions will be unlocked here.
                               </p>
                             </div>
                           )}
@@ -542,6 +550,14 @@ const TransporterPortal = () => {
                                     </strong>
                                   </div>
                                 )}
+                                {isSubmitted && (po.tp_number || tpNumbers[po.id]) && (
+                                  <div className="space-y-0.5">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">TP Number</span>
+                                    <strong className="text-slate-900 font-semibold text-base">
+                                      {po.tp_number || tpNumbers[po.id]}
+                                    </strong>
+                                  </div>
+                                )}
                                 {po.transporter_remarks && (
                                   <div className="col-span-1 sm:col-span-2 space-y-0.5 pt-2 border-t border-slate-100">
                                     <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Your Remarks</span>
@@ -567,6 +583,21 @@ const TransporterPortal = () => {
                                   <span>{formErrors[po.id]}</span>
                                 </div>
                               )}
+
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                  <Hash size={15} className="text-slate-400" /> TP Number *
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                  placeholder="Enter TP Number"
+                                  value={tpNumbers[po.id] || ""}
+                                  onChange={(e) => setTpNumbers(prev => ({ ...prev, [po.id]: e.target.value }))}
+                                  disabled={!isReadyForApproval}
+                                />
+                              </div>
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">

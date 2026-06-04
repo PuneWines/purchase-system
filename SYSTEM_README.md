@@ -53,13 +53,6 @@ A comprehensive React-based purchase management system with role-based access co
 - Discrepancy management (Partial, Complete deliveries)
 - Warehouse manager assignment
 
-### Master Items
-
-- Manage inventory items
-- Category and specification management
-- Reorder level configuration
-- Stock management tracking
-
 ### Settings & User Management (Admin Only)
 
 - Create new user accounts
@@ -102,7 +95,6 @@ A comprehensive React-based purchase management system with role-based access co
 | Trader Verification      | Validate Vendors, Track Credentials    |
 | Transporter Verification | Verify Partners, License Management    |
 | Receiving                | Track Deliveries, Quantity Checks      |
-| Master Items             | Manage Inventory, Specifications       |
 | Settings                 | User Management, Permission Assignment |
 
 ## 🎨 UI Features
@@ -134,7 +126,6 @@ Each user can have different permissions for these modules:
 - Trader Verification
 - Transporter Verification
 - Receiving
-- Master Items
 - Settings
 
 ### Admin Panel
@@ -157,7 +148,6 @@ The system comes with comprehensive dummy data for all modules:
 - 3 trader verification records
 - 3 transporter verification records
 - 3 receiving records
-- 4 master item entries
 
 ## 🚀 Getting Started
 
@@ -208,7 +198,6 @@ src/
 │   ├── TraderVerification.jsx
 │   ├── TransporterVerification.jsx
 │   ├── Receiving.jsx
-│   ├── MasterItem.jsx
 │   └── Settings.jsx
 ├── styles/
 │   ├── index.css
@@ -257,7 +246,6 @@ src/
 4. **Verify Trader** → Validate vendor
 5. **Verify Transporter** → Confirm logistics
 6. **Receive Goods** → Track delivery
-7. **Update Master Items** → Update inventory
 
 ## 📝 Notes
 

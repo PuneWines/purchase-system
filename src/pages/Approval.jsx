@@ -632,6 +632,7 @@ const Approval = () => {
                       <th style={thStyle}>Indent ID</th>
                       <th style={thStyle}>Shop Name</th>
                       <th style={thStyle}>Item Name</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Per Day Sale</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Box</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Order Qty</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>Closing Qty</th>
@@ -683,6 +684,9 @@ const Approval = () => {
                         <td style={{ ...tdStyle, color: '#64748b' }}>{item.party_indent_id || "-"}</td>
                         <td style={tdStyle}>{item.shop_name || "-"}</td>
                         <td style={tdStyle}>{item.item_name}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>
+                          {item.per_day_sale_last_month !== null && item.per_day_sale_last_month !== undefined ? item.per_day_sale_last_month : "—"}
+                        </td>
                         <td style={{ ...tdStyle, padding: activeTab === 'history' ? '12px 16px' : '4px 8px' }}>
                           {activeTab === 'history' ? (
                             <span style={{ fontWeight: '700', color: '#4338ca' }}>{item.order_box || "-"}</span>
@@ -809,6 +813,7 @@ const Approval = () => {
                               <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Indent ID</th>
                               <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Shop Name</th>
                               <th style={{ ...thStyle, backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Item Name</th>
+                              <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Per Day Sale</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Box</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Order Qty</th>
                               <th style={{ ...thStyle, textAlign: 'right', backgroundColor: '#fef2f2', color: '#991b1b', borderBottom: '2px solid #fca5a5' }}>Closing Qty</th>
@@ -849,6 +854,9 @@ const Approval = () => {
                                   <td style={{ ...tdStyle, color: '#991b1b' }}>{item.party_indent_id || "-"}</td>
                                   <td style={tdStyle}>{item.shop_name || "-"}</td>
                                   <td style={tdStyle}>{item.item_name}</td>
+                                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>
+                                    {item.per_day_sale_last_month !== null && item.per_day_sale_last_month !== undefined ? item.per_day_sale_last_month : "—"}
+                                  </td>
                                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_box || "-"}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#dc2626' }}>{item.order_qty || "-"}</td>
                                   <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
@@ -863,7 +871,7 @@ const Approval = () => {
                                (item.brand_name && item.brand_name.toLowerCase().includes(excludedSearchQuery.toLowerCase())))
                             ).length === 0 && (
                               <tr>
-                                <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                                <td colSpan={10} style={{ ...tdStyle, textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
                                   No excluded items found matching your search.
                                 </td>
                               </tr>

@@ -7,10 +7,10 @@ import Dashboard from "./pages/Dashboard";
 import Indent from "./pages/Indent";
 import Approval from "./pages/Approval";
 import PurchaseOrder from "./pages/PurchaseOrder";
+import POHistory from "./pages/POHistory";
 import TraderVerification from "./pages/TraderVerification";
 import TransporterVerification from "./pages/TransporterVerification";
 import Receiving from "./pages/Receiving";
-import MasterItem from "./pages/MasterItem";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import VendorConfirmation from "./pages/VendorConfirmation";
@@ -70,10 +70,10 @@ const AppContent = () => {
             <Route path="/indent" element={<ProtectedRoute><Indent /></ProtectedRoute>} />
             <Route path="/approval" element={<ProtectedRoute><Approval /></ProtectedRoute>} />
             <Route path="/po" element={<ProtectedRoute><PurchaseOrder /></ProtectedRoute>} />
+            <Route path="/po-history" element={<ProtectedRoute><POHistory /></ProtectedRoute>} />
             <Route path="/trader_verification" element={<ProtectedRoute><TraderVerification /></ProtectedRoute>} />
             <Route path="/transporter_verification" element={<ProtectedRoute><TransporterVerification /></ProtectedRoute>} />
             <Route path="/receiving" element={<ProtectedRoute><Receiving /></ProtectedRoute>} />
-            <Route path="/master_item" element={<ProtectedRoute><MasterItem /></ProtectedRoute>} />
             <Route path="/setting" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

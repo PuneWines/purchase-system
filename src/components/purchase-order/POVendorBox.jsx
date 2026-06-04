@@ -1,7 +1,7 @@
 import React from "react";
 import SearchableDropdown from "./SearchableDropdown";
 
-const POVendorBox = ({ dbParties, partyName, onPartyChange, vendorDetails }) => {
+const POVendorBox = ({ dbParties, partyName, onPartyChange, vendorDetails, onDeleteVendor }) => {
   return (
     <div className="po-box">
       <div className="po-box-header">Vendor</div>
@@ -24,6 +24,7 @@ const POVendorBox = ({ dbParties, partyName, onPartyChange, vendorDetails }) => 
               if (onPartyChange) onPartyChange(val);
             }} 
             placeholder="Select a party"
+            onDeleteOption={onDeleteVendor}
           />
         </div>
         <strong>Address:</strong> {vendorDetails?.address || "—"}<br />

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Printer, ShoppingCart, FileText } from "lucide-react";
+import { Printer, ShoppingCart, FileText, Trash2 } from "lucide-react";
 import useCompanyStore from "../store/useCompanyStore";
 import useShopStore from "../store/useShopStore";
 import "../styles/PurchaseOrder.css";
 
 // Components
 import PurchaseOrderPreview from "../components/purchase-order/PurchaseOrderPreview";
+import Toast, { useToast } from "../components/Toast";
 
 // PDF Templates
 import TraderPDF from "../pdf/TraderPDF";
@@ -19,7 +20,8 @@ import {
   insertPurchaseOrder,
   getOrCreateVendorPortalLink,
   getOrCreateTransporterPortalLink,
-  getOrCreateReceiverPortalLink
+  getOrCreateReceiverPortalLink,
+  excludeIndentItems
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
 import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
@@ -46,6 +48,14 @@ const PurchaseOrder = () => {
   const [shippingError, setShippingError] = useState("");
   const printRef = useRef();
   const isSubmittingRef = useRef(false);
+
+  const { toasts, addToast, removeToast } = useToast();
+  const [removedItemIds, setRemovedItemIds] = useState(new Set());
+
+  // Reset removed items when active vendor changes
+  useEffect(() => {
+    setRemovedItemIds(new Set());
+  }, [activeParty]);
 
   const loadPageData = async (shouldShowLoading = true) => {
     if (shouldShowLoading) setIsLoading(true);
@@ -109,8 +119,49 @@ const PurchaseOrder = () => {
   }, [selectedShop, dbParties, activeParty]);
 
   const itemsForActiveParty = useMemo(() => {
-    return transformActivePartyItems(filteredApprovedItems, activeParty);
-  }, [filteredApprovedItems, activeParty]);
+    const rawItems = transformActivePartyItems(filteredApprovedItems, activeParty);
+    return rawItems.filter(item => !removedItemIds.has(item.id));
+  }, [filteredApprovedItems, activeParty, removedItemIds]);
+
+  const handleRemoveItem = (itemId) => {
+    const item = itemsForActiveParty.find(i => i.id === itemId);
+    const itemName = item ? item.itemName : "this item";
+    if (window.confirm(`Are you sure you want to remove "${itemName}" from the Purchase Order?`)) {
+      setRemovedItemIds(prev => {
+        const next = new Set(prev);
+        next.add(itemId);
+        return next;
+      });
+      addToast(`Removed "${itemName}" from current PO view.`, "info");
+    }
+  };
+
+  const handleDeleteVendor = async (vendorName) => {
+    const itemsToExclude = filteredApprovedItems.filter(item => item.party_name === vendorName);
+    if (itemsToExclude.length === 0) {
+      addToast(`No items found to exclude for vendor "${vendorName}".`, "warning");
+      return;
+    }
+
+    const confirmMsg = `Are you sure you want to delete vendor "${vendorName}" from available PO selection?\n\nThis will exclude all ${itemsToExclude.length} approved item(s) for this vendor under the selected shop "${selectedShop}".`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const idsToExclude = itemsToExclude.map(item => item.id);
+      await excludeIndentItems(idsToExclude, "vendor_removed_from_po");
+
+      addToast(`Vendor "${vendorName}" removed from PO selection.`, "success");
+
+      if (activeParty === vendorName) {
+        setActiveParty("");
+      }
+
+      await loadPageData(false);
+    } catch (err) {
+      console.error("Error deleting vendor:", err);
+      addToast("Failed to delete vendor: " + err.message, "error");
+    }
+  };
 
   // Reactively auto-select company based on selected vendor (activeParty) and their items
   useEffect(() => {
@@ -154,7 +205,7 @@ const PurchaseOrder = () => {
     if (isSubmittingRef.current || isUploading) return;
 
     if (!activeVendorDetails?.contact) {
-      alert("Error: The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
+      addToast("Error: The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.", "error");
       setShippingError("The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
       return;
     }
@@ -252,6 +303,7 @@ const PurchaseOrder = () => {
         vendor_id: currentVendorId,
         trader_pdf_url: traderUrl,
         receiver_pdf_url: receiverUrl,
+        transporter_pdf_url: traderUrl,
         indent_id: currentIndentId,
         first_brand_name: firstBrandName,
         total_order_qty: totalOrderQty,
@@ -261,6 +313,16 @@ const PurchaseOrder = () => {
       });
 
       const insertedPoId = insertedData[0]?.id;
+
+      // Update deleted/removed items in database to be is_excluded: true
+      if (removedItemIds.size > 0) {
+        try {
+          await excludeIndentItems(Array.from(removedItemIds), "removed_from_po");
+          console.log("Successfully excluded removed items in DB");
+        } catch (exError) {
+          console.error("Failed to exclude removed items in DB:", exError);
+        }
+      }
 
       // --- Fetch / Generate Portal Links ---
       const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
@@ -349,7 +411,7 @@ const PurchaseOrder = () => {
         });
       }
 
-      alert("Purchase Orders successfully generated and submitted to Supabase!");
+      addToast("Purchase Orders successfully generated and submitted to Supabase!", "success");
       
       // Reset all model fields
       setActiveParty("");
@@ -362,7 +424,7 @@ const PurchaseOrder = () => {
 
     } catch (error) {
       console.error("Error generating/uploading PDF:", error);
-      alert("An error occurred during PDF export: " + error.message);
+      addToast("An error occurred during PDF export: " + error.message, "error");
     } finally {
       isSubmittingRef.current = false;
       setIsUploading(false);
@@ -388,7 +450,7 @@ const PurchaseOrder = () => {
       await previewPdfInNewTab(traderDoc);
     } catch (error) {
       console.error("Error previewing PDF:", error);
-      alert("An error occurred during PDF preview: " + error.message);
+      addToast("An error occurred during PDF preview: " + error.message, "error");
     } finally {
       setIsUploading(false);
     }
@@ -412,6 +474,7 @@ const PurchaseOrder = () => {
 
   return (
     <div className="po-page">
+      <Toast toasts={toasts} removeToast={removeToast} />
 
       {/* Top bar */}
       <div className="po-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
@@ -472,6 +535,8 @@ const PurchaseOrder = () => {
             selectedReceiver={selectedReceiver}
             setSelectedReceiver={setSelectedReceiver}
             shippingError={shippingError}
+            onRemoveItem={handleRemoveItem}
+            onDeleteVendor={handleDeleteVendor}
           />
         </div>
       )}
