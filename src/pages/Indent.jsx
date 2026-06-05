@@ -827,7 +827,7 @@ const Indent = () => {
         .select("party_indent_id")
         .not("party_indent_id", "is", null)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(1000); // Fetch more rows to reduce risk of missing a higher existing index
 
       if (!maxIdError && maxIdData && maxIdData.length > 0) {
         let maxIdx = 0;
