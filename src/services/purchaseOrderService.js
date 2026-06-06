@@ -212,3 +212,22 @@ export const excludeIndentItems = async (ids, reason) => {
   if (error) throw error;
   return data;
 };
+
+/**
+ * Delete all indent_items belonging to a specific unique_indent_id (group key)
+ * after a PO has been successfully created.
+ * This removes both approved (non-excluded) and excluded items in the batch.
+ * The parent `indents` row is intentionally left in place (Option A).
+ *
+ * @param {string} uniqueIndentId - The scoped group key (e.g. "<indent_uuid>::IN-1")
+ */
+export const deleteIndentAfterPO = async (uniqueIndentId) => {
+  if (!uniqueIndentId) return;
+
+  const { error } = await supabase
+    .from("indent_items")
+    .delete()
+    .eq("unique_indent_id", uniqueIndentId);
+
+  if (error) throw error;
+};

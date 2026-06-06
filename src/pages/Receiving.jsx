@@ -68,8 +68,11 @@ const Receiving = () => {
         }, {});
 
         const enrichedPoData = poData.map(po => {
-          const parentIndentId = itemMap[po.indent_id];
-          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          let shopName = po.shop_name || null;
+          if (!shopName) {
+            const parentIndentId = itemMap[po.indent_id];
+            shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          }
           return {
             ...po,
             shop_name: shopName

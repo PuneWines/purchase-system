@@ -25,6 +25,23 @@ const TERMS = [
   "Delivery should be strictly done within 5 days from the date of purchase order.",
 ];
 
+const formatForDateTimeLocal = (dateStr) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (num) => String(num).padStart(2, "0");
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  } catch (e) {
+    return "";
+  }
+};
+
 const VendorPortal = () => {
   const { vendorId } = useParams();
   const [vendorName, setVendorName] = useState("Vendor");
@@ -82,12 +99,12 @@ const VendorPortal = () => {
 
       setVendorName(vendorRow.party_name);
 
-      // 3. Fetch POs matching this vendor name that are pending trader action
+      // 3. Fetch POs matching this vendor name where receiver has not finished confirmation
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("vendor_name", vendorRow.party_name)
-        .or("trader_status.is.null,trader_status.eq.")
+        .or("receiver_status.is.null,receiver_status.eq.")
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
@@ -102,7 +119,7 @@ const VendorPortal = () => {
       pos?.forEach(po => {
         if (po.trader_status === "yes") {
           newTpNumbers[po.id] = po.tp_number || "";
-          newDispatchDates[po.id] = po.dispatch_date || "";
+          newDispatchDates[po.id] = formatForDateTimeLocal(po.dispatch_date);
           newRemarks[po.id] = po.remarks || "";
           newItemStatuses[po.id] = po.trader_item_statuses || {};
         }
@@ -138,6 +155,32 @@ const VendorPortal = () => {
 
     // If items already loaded, don't fetch again
     if (poItems[po.id]) return;
+
+    // If po has saved po_items, load them directly
+    if (po.po_items && Array.isArray(po.po_items) && po.po_items.length > 0) {
+      const processed = po.po_items.map(item => ({
+        id: item.id,
+        itemName: item.itemName || item.item_name,
+        brandName: item.brandName || item.brand_name,
+        orderQty: item.orderQty !== undefined ? parseFloat(item.orderQty) : parseFloat(item.order_qty || 0),
+        orderBox: item.orderBox !== undefined ? parseFloat(item.orderBox) : parseFloat(item.order_box || 0),
+        qtyType: item.qtyType,
+        displayQty: item.displayQty,
+        shopName: item.shopName || item.shop_name || "Unknown"
+      }));
+
+      setPoItems(prev => ({ ...prev, [po.id]: processed }));
+
+      // If PO not yet submitted, initialize item statuses to approved
+      if (po.trader_status !== "yes" && !itemStatuses[po.id]) {
+        const initialStatuses = {};
+        processed.forEach(item => {
+          initialStatuses[item.id] = "approved";
+        });
+        setItemStatuses(prev => ({ ...prev, [po.id]: initialStatuses }));
+      }
+      return;
+    }
 
     try {
       setLoadingItems(prev => ({ ...prev, [po.id]: true }));
@@ -434,9 +477,23 @@ const VendorPortal = () => {
               const totalQty = po.total_order_qty || 0;
               const totalBox = po.total_order_box || 0;
 
+              const getShopName = () => {
+                if (po.shop_name) return po.shop_name;
+                let list = po.po_items;
+                if (typeof list === "string") {
+                  try {
+                    list = JSON.parse(list);
+                  } catch (e) {
+                    list = null;
+                  }
+                }
+                return list?.[0]?.shopName || list?.[0]?.shop_name || "Unknown";
+              };
+              const shopName = getShopName();
+
               return (
                 <div key={po.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-                  
+                   
                   {/* PO Card Header */}
                   <div 
                     onClick={() => handleToggleExpand(po)}
@@ -451,6 +508,9 @@ const VendorPortal = () => {
                       </div>
 
                       {/* Info mini-tags */}
+                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-lg text-xs font-bold">
+                        {shopName}
+                      </span>
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-semibold">
                         {totalQty} Qty
                       </span>
@@ -585,9 +645,12 @@ const VendorPortal = () => {
                                   <strong className="text-slate-900 font-semibold">{tpNumbers[po.id] || po.tp_number || "—"}</strong>
                                 </div>
                                 <div className="space-y-0.5">
-                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Expected Dispatch Date</span>
+                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Expected Dispatch Date & Time</span>
                                   <strong className="text-slate-900 font-semibold">
-                                    {new Date(dispatchDates[po.id] || po.dispatch_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                    {new Date(dispatchDates[po.id] || po.dispatch_date).toLocaleString("en-IN", { 
+                                      day: "2-digit", month: "short", year: "numeric",
+                                      hour: "2-digit", minute: "2-digit", hour12: true
+                                    })}
                                   </strong>
                                 </div>
                                 {(remarks[po.id] || po.remarks) && (
@@ -616,15 +679,15 @@ const VendorPortal = () => {
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date *
+                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date & Time *
                                 </label>
                                 <input
-                                  type="date"
+                                  type="datetime-local"
                                   required
                                   className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
                                   value={dispatchDates[po.id] || ""}
                                   onChange={(e) => setDispatchDates(prev => ({ ...prev, [po.id]: e.target.value }))}
-                                  min={new Date().toISOString().split("T")[0]}
+                                  min={formatForDateTimeLocal(new Date())}
                                 />
                               </div>
 
@@ -795,9 +858,12 @@ const VendorPortal = () => {
                 <div style={{ fontSize: "14px", fontWeight: "700", color: "#14532d" }}>{pdfData.tpNum}</div>
               </div>
               <div>
-                <span style={{ fontSize: "10px", color: "#166534", textTransform: "uppercase", fontWeight: "700" }}>Expected Dispatch Date:</span>
+                <span style={{ fontSize: "10px", color: "#166534", textTransform: "uppercase", fontWeight: "700" }}>Expected Dispatch Date & Time:</span>
                 <div style={{ fontSize: "14px", fontWeight: "700", color: "#14532d" }}>
-                  {new Date(pdfData.dDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  {new Date(pdfData.dDate).toLocaleString("en-IN", { 
+                    day: "2-digit", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit", hour12: true
+                  })}
                 </div>
               </div>
               {pdfData.remarks && (

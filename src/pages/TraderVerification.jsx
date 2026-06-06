@@ -61,9 +61,14 @@ const TraderVerification = () => {
           }
           const diff = item.receiver_status === 'yes' ? totalReceivedQty - (Number(item.total_order_qty) || 0) : null;
           
-          // Resolve shop name
-          const parentIndentId = itemMap[item.indent_id];
-          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          // Prefer the shop_name stored directly on the PO (set at creation time).
+          // Fall back to the indent_items → indents join for older records that
+          // were created before shop_name was persisted on the PO.
+          let shopName = item.shop_name || null;
+          if (!shopName) {
+            const parentIndentId = itemMap[item.indent_id];
+            shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          }
 
           return {
             ...item,
@@ -73,7 +78,8 @@ const TraderVerification = () => {
               hour: "2-digit", minute: "2-digit"
             }),
             totalReceivedQty: item.receiver_status === 'yes' ? totalReceivedQty : "N/A",
-            qtyDifference: diff
+            qtyDifference: diff,
+            total_items: Array.isArray(item.po_items) ? item.po_items.length : 0
           };
         });
         setData(formatted);
@@ -90,15 +96,9 @@ const TraderVerification = () => {
     { key: "indent_id", label: "Indent ID", sortable: true },
     { key: "shop_name", label: "Shop Name", sortable: true },
     { key: "vendor_name", label: "Vendor Name", sortable: true },
-    { key: "first_brand_name", label: "1st Brand Name", sortable: true },
-    { key: "total_order_qty", label: "Total Order Qty", sortable: true },
+    { key: "total_items", label: "Total Items", sortable: true },
+    { key: "total_order_qty", label: "Total Order Qty (Bottels)", sortable: true },
     { key: "total_order_box", label: "Total Order Box", sortable: true },
-    {
-      key: "tp_number",
-      label: "TP Number",
-      sortable: true,
-      render: (tp) => tp || <span style={{ color: "#94a3b8" }}>—</span>
-    },
     {
       key: "trader_item_statuses",
       label: "Item Approvals",
@@ -138,7 +138,15 @@ const TraderVerification = () => {
         return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
       }
     },
-    { key: "dispatch_date", label: "Dispatch Date", sortable: true },
+    { 
+      key: "dispatch_date", 
+      label: "Dispatch Date & Time", 
+      sortable: true,
+      render: (date) => date ? new Date(date).toLocaleString("en-IN", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true
+      }) : <span style={{ color: "#94a3b8" }}>—</span>
+    },
     { key: "remarks", label: "Trader Remarks", sortable: false }
   ];
 
@@ -160,7 +168,7 @@ const TraderVerification = () => {
           data={filteredData}
           columns={columns}
           title="Purchase Orders Log"
-          searchableColumns={["po_number", "indent_id", "shop_name", "vendor_name", "first_brand_name"]}
+          searchableColumns={["po_number", "indent_id", "shop_name", "vendor_name", "total_items"]}
           showHeader={false}
         />
       )}

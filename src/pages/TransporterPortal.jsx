@@ -58,12 +58,12 @@ const TransporterPortal = () => {
       }
       setTransporter(transp);
 
-      // 2. Fetch pending POs for this transporter
+      // 2. Fetch pending POs for this transporter where receiver has not finished confirmation
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("transporter_number", transp.contact_number)
-        .or("transporter_status.is.null,transporter_status.eq.")
+        .or("receiver_status.is.null,receiver_status.eq.")
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
@@ -111,6 +111,41 @@ const TransporterPortal = () => {
     // If items already loaded, don't fetch again
     if (poItems[po.id]) return;
 
+    // If po has saved po_items, load them directly
+    if (po.po_items && Array.isArray(po.po_items) && po.po_items.length > 0) {
+      const processed = po.po_items.map(item => {
+        const orderBox = item.orderBox !== undefined ? parseFloat(item.orderBox) : parseFloat(item.order_box || 0);
+        const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : parseFloat(item.order_qty || 0);
+        const qtyType = item.qtyType || (orderBox >= 0.90 ? "Box" : "Bottles");
+        const displayQty = item.displayQty || (qtyType === "Box" 
+          ? Math.round(orderBox).toString() 
+          : Math.ceil(orderQty).toString());
+        return {
+          id: item.id,
+          itemName: item.itemName || item.item_name,
+          brandName: item.brandName || item.brand_name,
+          orderQty,
+          orderBox,
+          qtyType,
+          displayQty,
+          shopName: item.shopName || item.shop_name || "Unknown"
+        };
+      });
+
+      setPoItems(prev => ({ ...prev, [po.id]: processed }));
+
+      // Prefill delivered quantities: use saved delivered_items if present, else default to displayQty
+      if (!deliveredQtys[po.id]) {
+        const savedDelivered = po.delivered_items || {};
+        const initialDelivered = {};
+        processed.forEach(item => {
+          initialDelivered[item.id] = savedDelivered[item.id]?.deliveredQty ?? parseFloat(item.displayQty);
+        });
+        setDeliveredQtys(prev => ({ ...prev, [po.id]: initialDelivered }));
+      }
+      return;
+    }
+
     try {
       setLoadingItems(prev => ({ ...prev, [po.id]: true }));
 
@@ -154,12 +189,12 @@ const TransporterPortal = () => {
 
       setPoItems(prev => ({ ...prev, [po.id]: processed }));
 
-      // Prefill delivered quantities: use saved delivered_items if present, else default to orderQty
+      // Prefill delivered quantities: use saved delivered_items if present, else default to displayQty
       if (!deliveredQtys[po.id]) {
         const savedDelivered = po.delivered_items || {};
         const initialDelivered = {};
         processed.forEach(item => {
-          initialDelivered[item.id] = savedDelivered[item.id]?.deliveredQty ?? item.orderQty;
+          initialDelivered[item.id] = savedDelivered[item.id]?.deliveredQty ?? parseFloat(item.displayQty);
         });
         setDeliveredQtys(prev => ({ ...prev, [po.id]: initialDelivered }));
       }
@@ -217,7 +252,7 @@ const TransporterPortal = () => {
         deliveredItemsJSON[item.id] = {
           itemName: item.itemName,
           orderQty: item.orderQty,
-          deliveredQty: qtys[item.id] ?? item.orderQty
+          deliveredQty: qtys[item.id] ?? parseFloat(item.displayQty)
         };
       });
 
@@ -347,6 +382,20 @@ const TransporterPortal = () => {
                 badgeColorClass = "bg-red-50 text-red-700 border-red-200";
               }
 
+              const getShopName = () => {
+                if (po.shop_name) return po.shop_name;
+                let list = po.po_items;
+                if (typeof list === "string") {
+                  try {
+                    list = JSON.parse(list);
+                  } catch (e) {
+                    list = null;
+                  }
+                }
+                return list?.[0]?.shopName || list?.[0]?.shop_name || "Unknown";
+              };
+              const shopName = getShopName();
+
               return (
                 <div key={po.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
                   
@@ -361,6 +410,9 @@ const TransporterPortal = () => {
                         <span className="text-xs text-slate-500">Vendor: <strong className="text-slate-700">{po.vendor_name}</strong></span>
                       </div>
 
+                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-lg text-xs font-bold">
+                        {shopName}
+                      </span>
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-semibold">
                         {totalQty} Qty
                       </span>
@@ -410,9 +462,12 @@ const TransporterPortal = () => {
                               </h4>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-0.5">
-                                  <span className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider block">Expected Dispatch Date</span>
+                                  <span className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider block">Expected Dispatch Date & Time</span>
                                   <div className="text-emerald-950 font-bold text-base">
-                                    {new Date(po.dispatch_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                    {new Date(po.dispatch_date).toLocaleString("en-IN", { 
+                                      day: "2-digit", month: "short", year: "numeric",
+                                      hour: "2-digit", minute: "2-digit", hour12: true
+                                    })}
                                   </div>
                                 </div>
                                 {po.remarks && (
@@ -490,24 +545,36 @@ const TransporterPortal = () => {
                                               )}
                                             </div>
                                           </td>
-                                          <td className={`p-3 text-center font-bold ${ isApprovedByTrader ? "text-slate-900" : "text-red-300 line-through"}`}>
-                                            {item.displayQty}
+                                          <td className="p-3 text-center">
+                                            <div className="flex flex-col items-center">
+                                              <span className={`font-bold ${isApprovedByTrader ? "text-slate-900" : "text-red-300 line-through"}`}>
+                                                {item.displayQty}
+                                              </span>
+                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 mt-1 uppercase tracking-wider">
+                                                {item.qtyType}
+                                              </span>
+                                            </div>
                                           </td>
                                           <td className="p-3 text-center">
-                                            {isSubmitted || isRejected ? (
-                                              <span className="font-bold text-slate-800">
-                                                {isApprovedByTrader ? (savedDelivered ?? "—") : "0"}
+                                            <div className="flex flex-col items-center gap-1 justify-center">
+                                              {isSubmitted || isRejected ? (
+                                                <span className="font-bold text-slate-800">
+                                                  {isApprovedByTrader ? (savedDelivered ?? "—") : "0"}
+                                                </span>
+                                              ) : (
+                                                <input
+                                                  type="number"
+                                                  className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                                                  value={currentDeliveredVal}
+                                                  onChange={(e) => isApprovedByTrader && handleDeliveredQtyChange(po.id, item.id, e.target.value)}
+                                                  min="0"
+                                                  disabled={!isReadyForApproval || !isApprovedByTrader}
+                                                />
+                                              )}
+                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                                {item.qtyType}
                                               </span>
-                                            ) : (
-                                              <input
-                                                type="number"
-                                                className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                                                value={currentDeliveredVal}
-                                                onChange={(e) => isApprovedByTrader && handleDeliveredQtyChange(po.id, item.id, e.target.value)}
-                                                min="0"
-                                                disabled={!isReadyForApproval || !isApprovedByTrader}
-                                              />
-                                            )}
+                                            </div>
                                           </td>
                                           <td className="p-3 text-center">
                                             {isApprovedByTrader ? (

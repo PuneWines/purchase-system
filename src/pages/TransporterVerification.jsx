@@ -36,12 +36,33 @@ const TransporterVerification = () => {
         }, {});
 
         const formatted = poData.map(item => {
-          const parentIndentId = itemMap[item.indent_id];
-          const shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          let shopName = item.shop_name || null;
+          if (!shopName) {
+            const parentIndentId = itemMap[item.indent_id];
+            shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
+          }
+
+          let pickedUpCount = 0;
+          if (item.transporter_status === "yes") {
+            let delivered = item.delivered_items || {};
+            if (typeof delivered === "string") {
+              try {
+                delivered = JSON.parse(delivered);
+              } catch (e) {
+                delivered = {};
+              }
+            }
+            if (delivered && typeof delivered === "object") {
+              pickedUpCount = Object.values(delivered).filter(
+                val => val && Number(val.deliveredQty) > 0
+              ).length;
+            }
+          }
 
           return {
             ...item,
             shop_name: shopName,
+            pickedUpCount,
             formattedDate: new Date(item.created_at).toLocaleDateString("en-IN", {
               day: "2-digit", month: "short", year: "numeric",
               hour: "2-digit", minute: "2-digit"
@@ -61,6 +82,20 @@ const TransporterVerification = () => {
     { key: "po_number", label: "PO Number", sortable: true },
     { key: "shop_name", label: "Shop Name", sortable: true },
     { key: "vendor_name", label: "Vendor Name", sortable: true },
+    {
+      key: "pickedUpCount",
+      label: "Items Picked Up",
+      sortable: true,
+      render: (count, row) => {
+        if (row.transporter_status === "yes") {
+          return <span style={{ fontWeight: "600", color: "#16a34a" }}>{count}</span>;
+        }
+        if (row.transporter_status === "no") {
+          return <span style={{ color: "#dc2626" }}>0</span>;
+        }
+        return <span style={{ color: "#94a3b8" }}>—</span>;
+      }
+    },
     { key: "transporter_number", label: "Transporter Contact", sortable: true },
     {
       key: "tp_number",

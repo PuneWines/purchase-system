@@ -54,14 +54,12 @@ const ReceiverPortal = () => {
       }
       setReceiver(recv);
 
-      // 2. Fetch pending POs matching the receiver's contact number that are ready
-      // A PO is ready when the transporter has confirmed pick-up (transporter_status === 'yes')
-      // and receiver has not submitted action yet.
+      // 2. Fetch pending POs matching the receiver's contact number
+      // where receiver has not submitted action yet.
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("receiver_number", recv.contact_number)
-        .eq("transporter_status", "yes")
         .or("receiver_status.is.null,receiver_status.eq.")
         .order("created_at", { ascending: false });
 
@@ -100,6 +98,59 @@ const ReceiverPortal = () => {
 
     // If items already loaded, don't fetch again
     if (poItems[po.id]) return;
+
+    // If po has saved po_items, load them directly
+    let poItemsList = po.po_items;
+    if (typeof poItemsList === "string") {
+      try {
+        poItemsList = JSON.parse(poItemsList);
+      } catch (e) {
+        console.error("Failed to parse po_items string:", e);
+        poItemsList = null;
+      }
+    }
+
+    if (poItemsList && Array.isArray(poItemsList) && poItemsList.length > 0) {
+      const processed = poItemsList.map(item => {
+        const orderBox = item.orderBox !== undefined ? parseFloat(item.orderBox) : parseFloat(item.order_box || 0);
+        const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : parseFloat(item.order_qty || 0);
+        const qtyType = item.qtyType || (orderBox >= 0.90 ? "Box" : "Bottles");
+        const displayQty = item.displayQty || (qtyType === "Box" 
+          ? Math.round(orderBox).toString() 
+          : Math.ceil(orderQty).toString());
+        return {
+          id: item.id,
+          itemName: item.itemName || item.item_name,
+          brandName: item.brandName || item.brand_name,
+          orderQty,
+          orderBox,
+          qtyType,
+          displayQty,
+          closingQty: item.closingQty !== undefined ? item.closingQty : (item.closing_qty !== undefined ? item.closing_qty : null),
+          shopName: item.shopName || item.shop_name || "Unknown"
+        };
+      });
+
+      setPoItems(prev => ({ ...prev, [po.id]: processed }));
+
+      // Prefill received quantities from transporter's delivered_items if present, else displayQty
+      if (!po.receiver_status && !receivedQtys[po.id]) {
+        let savedDelivered = po.delivered_items || {};
+        if (typeof savedDelivered === "string") {
+          try {
+            savedDelivered = JSON.parse(savedDelivered);
+          } catch (e) {
+            savedDelivered = {};
+          }
+        }
+        const initialQtys = {};
+        processed.forEach(item => {
+          initialQtys[item.id] = (savedDelivered && typeof savedDelivered === "object" ? savedDelivered[item.id]?.deliveredQty : undefined) ?? parseFloat(item.displayQty);
+        });
+        setReceivedQtys(prev => ({ ...prev, [po.id]: initialQtys }));
+      }
+      return;
+    }
 
     try {
       setLoadingItems(prev => ({ ...prev, [po.id]: true }));
@@ -145,13 +196,20 @@ const ReceiverPortal = () => {
 
       setPoItems(prev => ({ ...prev, [po.id]: processed }));
 
-      // Prefill received quantities from transporter's delivered_items if present, else orderQty
+      // Prefill received quantities from transporter's delivered_items if present, else displayQty
       if (!po.receiver_status && !receivedQtys[po.id]) {
-        const savedDelivered = po.delivered_items || {};
+        let savedDelivered = po.delivered_items || {};
+        if (typeof savedDelivered === "string") {
+          try {
+            savedDelivered = JSON.parse(savedDelivered);
+          } catch (e) {
+            savedDelivered = {};
+          }
+        }
         const initialQtys = {};
         processed.forEach(item => {
           // Use transporter's delivered qty as starting point if available
-          initialQtys[item.id] = savedDelivered[item.id]?.deliveredQty ?? item.orderQty;
+          initialQtys[item.id] = (savedDelivered && typeof savedDelivered === "object" ? savedDelivered[item.id]?.deliveredQty : undefined) ?? parseFloat(item.displayQty);
         });
         setReceivedQtys(prev => ({ ...prev, [po.id]: initialQtys }));
       }
@@ -175,13 +233,20 @@ const ReceiverPortal = () => {
     }));
   };
 
-  // Quick Action: Match all – prefill from transporter delivered qty, fallback to orderQty
+  // Quick Action: Match all – prefill from transporter delivered qty, fallback to displayQty
   const handleMatchAll = (poId, po) => {
     const items = poItems[poId] || [];
-    const savedDelivered = po?.delivered_items || {};
+    let savedDelivered = po?.delivered_items || {};
+    if (typeof savedDelivered === "string") {
+      try {
+        savedDelivered = JSON.parse(savedDelivered);
+      } catch (e) {
+        savedDelivered = {};
+      }
+    }
     const matched = {};
     items.forEach(item => {
-      matched[item.id] = savedDelivered[item.id]?.deliveredQty ?? item.orderQty;
+      matched[item.id] = (savedDelivered && typeof savedDelivered === "object" ? savedDelivered[item.id]?.deliveredQty : undefined) ?? parseFloat(item.displayQty);
     });
     setReceivedQtys(prev => ({ ...prev, [poId]: matched }));
   };
@@ -231,7 +296,7 @@ const ReceiverPortal = () => {
         receivedItemsJSON[item.id] = {
           itemName: item.itemName,
           orderQty: item.orderQty,
-          receivedQty: qtys[item.id]
+          receivedQty: qtys[item.id] ?? parseFloat(item.displayQty)
         };
       });
 
@@ -333,10 +398,25 @@ const ReceiverPortal = () => {
               const isRejected = po.receiver_status === "no";
               const items = poItems[po.id] || [];
               const isLoadingPoItems = loadingItems[po.id];
+              const isLocked = po.transporter_status !== "yes";
 
               // Totals
               const totalQty = po.total_order_qty || 0;
               const totalBox = po.total_order_box || 0;
+
+              const getShopName = () => {
+                if (po.shop_name) return po.shop_name;
+                let list = po.po_items;
+                if (typeof list === "string") {
+                  try {
+                    list = JSON.parse(list);
+                  } catch (e) {
+                    list = null;
+                  }
+                }
+                return list?.[0]?.shopName || list?.[0]?.shop_name || "Unknown";
+              };
+              const shopName = getShopName();
 
               return (
                 <div key={po.id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
@@ -352,15 +432,28 @@ const ReceiverPortal = () => {
                         <span className="text-xs text-slate-500">Vendor: <strong className="text-slate-700">{po.vendor_name}</strong></span>
                       </div>
 
+                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-lg text-xs font-bold">
+                        {shopName}
+                      </span>
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-semibold">
                         {totalQty} Qty
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200">
-                        ⏳ Awaiting Delivery Confirmation
-                      </span>
+                      {po.trader_status !== "yes" ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-slate-100 text-slate-600 border-slate-200">
+                          ⏳ Awaiting Supplier Verification
+                        </span>
+                      ) : isLocked ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-slate-100 text-slate-600 border-slate-200">
+                          ⏳ Awaiting Transporter Confirmation
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200">
+                          ⏳ Awaiting Your Confirmation
+                        </span>
+                      )}
 
                       {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
                     </div>
@@ -392,6 +485,28 @@ const ReceiverPortal = () => {
                       ) : (
                         <div className="space-y-6">
                           
+                          {po.trader_status !== "yes" ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center shadow-sm flex flex-col items-center justify-center">
+                              <Truck size={28} className="text-amber-600 mb-2 animate-pulse" />
+                              <h4 className="text-sm font-bold text-amber-800 mb-1">
+                                Awaiting Supplier Verification
+                              </h4>
+                              <p className="text-xs text-amber-700 max-w-md leading-relaxed">
+                                The supplier ({po.vendor_name}) has not yet verified the dispatch details. You will be able to confirm delivery receipt here once they and the transporter complete their verification.
+                              </p>
+                            </div>
+                          ) : isLocked ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center shadow-sm flex flex-col items-center justify-center">
+                              <Truck size={28} className="text-amber-600 mb-2 animate-pulse" />
+                              <h4 className="text-sm font-bold text-amber-800 mb-1">
+                                Awaiting Transporter Confirmation
+                              </h4>
+                              <p className="text-xs text-amber-700 max-w-md leading-relaxed">
+                                The transporter has not yet confirmed the pickup or entered delivered quantities. You will be able to confirm delivery receipt here once they complete their verification.
+                              </p>
+                            </div>
+                          ) : null}
+                          
                           {/* Dispatch & Logistics Summaries */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             
@@ -406,9 +521,12 @@ const ReceiverPortal = () => {
                                   <strong className="text-slate-800 font-bold">{po.tp_number || "—"}</strong>
                                 </div>
                                 <div>
-                                  <span className="text-slate-500 font-medium block">Expected Dispatch</span>
+                                  <span className="text-slate-500 font-medium block">Expected Dispatch Date & Time</span>
                                   <strong className="text-slate-800 font-bold">
-                                    {po.dispatch_date ? new Date(po.dispatch_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                                    {po.dispatch_date ? new Date(po.dispatch_date).toLocaleString("en-IN", { 
+                                      day: "2-digit", month: "short", year: "numeric",
+                                      hour: "2-digit", minute: "2-digit", hour12: true
+                                    }) : "—"}
                                   </strong>
                                 </div>
                               </div>
@@ -441,14 +559,16 @@ const ReceiverPortal = () => {
                               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Item Receipt Ledger</span>
                               <div className="flex gap-2">
                                 <button 
-                                  onClick={() => handleMatchAll(po.id, po)}
-                                  className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 rounded text-xs font-bold transition-all cursor-pointer shadow-sm"
+                                  onClick={() => !isLocked && handleMatchAll(po.id, po)}
+                                  className={`px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs font-bold transition-all shadow-sm ${isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-emerald-100 cursor-pointer"}`}
+                                  disabled={isLocked}
                                 >
                                   Match Delivered
                                 </button>
                                 <button 
-                                  onClick={() => handleResetAll(po.id)}
-                                  className="px-2.5 py-1 bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold transition-all cursor-pointer shadow-sm"
+                                  onClick={() => !isLocked && handleResetAll(po.id)}
+                                  className={`px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded text-xs font-bold transition-all shadow-sm ${isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-200 cursor-pointer"}`}
+                                  disabled={isLocked}
                                 >
                                   Reset All
                                 </button>
@@ -470,14 +590,29 @@ const ReceiverPortal = () => {
                                 <tbody>
                                   {items.map((item, index) => {
                                     const currentQtyVal = (receivedQtys[po.id] || {})[item.id] ?? "";
-                                    const transporterDeliveredQty = po.delivered_items?.[item.id]?.deliveredQty;
-                                    const traderDecisions = po.trader_item_statuses || {};
-                                    const itemDecision = traderDecisions[item.id] || "approved";
+                                    let savedDelivered = po.delivered_items || {};
+                                    if (typeof savedDelivered === "string") {
+                                      try {
+                                        savedDelivered = JSON.parse(savedDelivered);
+                                      } catch (e) {
+                                        savedDelivered = {};
+                                      }
+                                    }
+                                    const transporterDeliveredQty = (savedDelivered && typeof savedDelivered === "object") ? savedDelivered[item.id]?.deliveredQty : undefined;
+                                    let traderDecisions = po.trader_item_statuses || {};
+                                    if (typeof traderDecisions === "string") {
+                                      try {
+                                        traderDecisions = JSON.parse(traderDecisions);
+                                      } catch (e) {
+                                        traderDecisions = {};
+                                      }
+                                    }
+                                    const itemDecision = (traderDecisions && typeof traderDecisions === "object") ? traderDecisions[item.id] || "approved" : "approved";
                                     const isApprovedByTrader = itemDecision === "approved";
 
-                                    // Difference: receiver qty vs transporter delivered qty (fallback to orderQty)
+                                    // Difference: receiver qty vs transporter delivered qty (fallback to displayQty)
                                     // For rejected items, show N/A
-                                    const referenceQty = transporterDeliveredQty ?? item.orderQty;
+                                    const referenceQty = transporterDeliveredQty ?? parseFloat(item.displayQty);
                                     const difference = isApprovedByTrader && currentQtyVal !== "" ? Number(currentQtyVal) - referenceQty : null;
 
                                     return (
@@ -507,8 +642,15 @@ const ReceiverPortal = () => {
                                             )}
                                           </div>
                                         </td>
-                                        <td className={`p-3 text-center font-bold ${ isApprovedByTrader ? "text-slate-900" : "text-red-300 line-through"}`}>
-                                          {item.orderQty}
+                                        <td className="p-3 text-center">
+                                          <div className="flex flex-col items-center">
+                                            <span className={`font-bold ${isApprovedByTrader ? "text-slate-900" : "text-red-300 line-through"}`}>
+                                              {item.displayQty}
+                                            </span>
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 mt-1 uppercase tracking-wider">
+                                              {item.qtyType}
+                                            </span>
+                                          </div>
                                         </td>
 
                                         {/* Closing Qty */}
@@ -520,45 +662,71 @@ const ReceiverPortal = () => {
 
                                         {/* Transporter Delivered Qty – read-only */}
                                         <td className="p-3 text-center">
-                                          {!isApprovedByTrader ? (
-                                            <span className="text-red-400 text-xs font-bold">Not Dispatched</span>
-                                          ) : transporterDeliveredQty != null ? (
-                                            <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-bold">
-                                              {transporterDeliveredQty}
-                                            </span>
-                                          ) : (
-                                            <span className="text-slate-400 text-xs">—</span>
-                                          )}
+                                          <div className="flex flex-col items-center gap-1 justify-center">
+                                            {!isApprovedByTrader ? (
+                                              <span className="text-red-400 text-xs font-bold">Not Dispatched</span>
+                                            ) : transporterDeliveredQty != null ? (
+                                              <>
+                                                <span className="bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-bold">
+                                                  {transporterDeliveredQty}
+                                                </span>
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                                  {item.qtyType}
+                                                </span>
+                                              </>
+                                            ) : (
+                                              <span className="text-slate-400 text-xs">—</span>
+                                            )}
+                                          </div>
                                         </td>
 
                                         {/* Receiver Qty – editable (locked at 0 for rejected items) */}
                                         <td className="p-3 text-center">
-                                          <input
-                                            type="number"
-                                            className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                                            value={isApprovedByTrader ? currentQtyVal : 0}
-                                            onChange={(e) => isApprovedByTrader && handleQtyChange(po.id, item.id, e.target.value)}
-                                            min="0"
-                                            disabled={!isApprovedByTrader}
-                                          />
+                                          <div className="flex flex-col items-center gap-1 justify-center">
+                                            <input
+                                              type="number"
+                                              className="w-20 px-2 py-1 border border-slate-300 rounded text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                                              value={isApprovedByTrader ? currentQtyVal : 0}
+                                              onChange={(e) => isApprovedByTrader && handleQtyChange(po.id, item.id, e.target.value)}
+                                              min="0"
+                                              disabled={!isApprovedByTrader || isLocked}
+                                            />
+                                            {isApprovedByTrader && (
+                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                                {item.qtyType}
+                                              </span>
+                                            )}
+                                          </div>
                                         </td>
 
                                         <td className="p-3 text-center">
-                                          {!isApprovedByTrader ? (
-                                            <span className="text-red-400 text-xs font-semibold">N/A</span>
-                                          ) : difference === 0 ? (
-                                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                                              Match
-                                            </span>
-                                          ) : difference !== null && difference < 0 ? (
-                                            <span className="bg-red-50 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                                              {difference} Shortage
-                                            </span>
-                                          ) : difference !== null ? (
-                                            <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                                              +{difference} Surplus
-                                            </span>
-                                          ) : null}
+                                          <div className="flex flex-col items-center gap-1 justify-center">
+                                            {!isApprovedByTrader ? (
+                                              <span className="text-red-400 text-xs font-semibold">N/A</span>
+                                            ) : difference === 0 ? (
+                                              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                                Match
+                                              </span>
+                                            ) : difference !== null && difference < 0 ? (
+                                              <>
+                                                <span className="bg-red-50 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                                  {difference} Shortage
+                                                </span>
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                                  {item.qtyType}
+                                                </span>
+                                              </>
+                                            ) : difference !== null ? (
+                                              <>
+                                                <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                                  +{difference} Surplus
+                                                </span>
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                                  {item.qtyType}
+                                                </span>
+                                              </>
+                                            ) : null}
+                                          </div>
                                         </td>
                                       </tr>
                                     );
@@ -568,10 +736,15 @@ const ReceiverPortal = () => {
                             </div>
                           </div>
 
-                          {/* Transporter actions form */}
+                          {/* Receiver actions form */}
                           <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm space-y-5">
-                            <h4 className="text-sm font-bold text-slate-950 border-b border-slate-200 pb-2">
-                              Confirm stock Delivery Receipt
+                            <h4 className="text-sm font-bold text-slate-950 border-b border-slate-200 pb-2 flex items-center justify-between">
+                              <span>Confirm stock Delivery Receipt</span>
+                              {isLocked && (
+                                <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded border border-red-100 uppercase">
+                                  Locked
+                                </span>
+                              )}
                             </h4>
 
                             {formErrors[po.id] && (
@@ -586,11 +759,12 @@ const ReceiverPortal = () => {
                                 <MessageSquare size={15} className="text-slate-400" /> Delivery Remarks (Optional for Accept, Required for Reject)
                               </label>
                               <textarea
-                                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
+                                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none disabled:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
                                 rows={3}
-                                placeholder="Any delivery notes, package shortages, structural comments or reasons..."
+                                placeholder={isLocked ? "Awaiting transporter confirmation..." : "Any delivery notes, package shortages, structural comments or reasons..."}
                                 value={remarks[po.id] || ""}
                                 onChange={(e) => setRemarks(prev => ({ ...prev, [po.id]: e.target.value }))}
+                                disabled={isLocked}
                               />
                             </div>
 
@@ -598,8 +772,8 @@ const ReceiverPortal = () => {
                               <button 
                                 type="button" 
                                 onClick={() => handleSubmitResponse(po, "no")}
-                                className="py-3 px-6 bg-red-100 hover:bg-red-200 border border-red-200 hover:border-red-300 text-red-800 text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-                                disabled={submittingPoId === po.id}
+                                className="py-3 px-6 bg-red-100 hover:bg-red-200 border border-red-200 hover:border-red-300 text-red-800 text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isLocked || submittingPoId === po.id}
                               >
                                 <X size={18} /> Reject Delivery
                               </button>
@@ -607,8 +781,8 @@ const ReceiverPortal = () => {
                               <button 
                                 type="button" 
                                 onClick={() => handleSubmitResponse(po, "yes")}
-                                className="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-                                disabled={submittingPoId === po.id}
+                                className="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isLocked || submittingPoId === po.id}
                               >
                                 {submittingPoId === po.id ? (
                                   <Loader2 className="animate-spin" size={18} />

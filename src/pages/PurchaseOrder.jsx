@@ -21,7 +21,8 @@ import {
   getOrCreateVendorPortalLink,
   getOrCreateTransporterPortalLink,
   getOrCreateReceiverPortalLink,
-  excludeIndentItems
+  excludeIndentItems,
+  deleteIndentAfterPO
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
 import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
@@ -285,6 +286,10 @@ const PurchaseOrder = () => {
       // --- Insert Database Record ---
       const currentIndentId = itemsForActiveParty.length > 0 ? itemsForActiveParty[0].unique_indent_id : null;
       const firstBrandName = itemsForActiveParty.length > 0 ? itemsForActiveParty[0].brandName : null;
+      // Capture shop name at creation time so it survives indent_items deletion
+      const currentShopName = itemsForActiveParty.length > 0
+        ? (itemsForActiveParty[0].shopName || itemsForActiveParty[0].shop_name || null)
+        : null;
 
       let totalOrderQty = 0;
       let totalOrderBox = 0;
@@ -306,13 +311,31 @@ const PurchaseOrder = () => {
         transporter_pdf_url: traderUrl,
         indent_id: currentIndentId,
         first_brand_name: firstBrandName,
+        shop_name: currentShopName,
         total_order_qty: totalOrderQty,
         total_order_box: totalOrderBox,
         transporter_number: selectedTransporter || null,
-        receiver_number: selectedReceiver || null
+        receiver_number: selectedReceiver || null,
+        po_items: itemsForActiveParty
       });
 
       const insertedPoId = insertedData[0]?.id;
+
+      // --- Delete all indent_items for this batch now that PO is created ---
+      // This removes both approved and excluded items linked to the same unique_indent_id.
+      // Non-fatal: if deletion fails the PO is already saved safely.
+      if (currentIndentId) {
+        try {
+          await deleteIndentAfterPO(currentIndentId);
+          console.log("✅ Indent items deleted after PO creation:", currentIndentId);
+        } catch (delError) {
+          console.error("⚠️ PO created but failed to delete indent items:", delError);
+          addToast(
+            "PO created successfully, but failed to clean up indent data. Please delete manually.",
+            "warning"
+          );
+        }
+      }
 
       // Update deleted/removed items in database to be is_excluded: true
       if (removedItemIds.size > 0) {

@@ -336,7 +336,23 @@ const Indent = () => {
   }, [daysDivisor]);
 
   const [showModal, setShowModal] = useState(false);
-  const [selectedShop, setSelectedShop] = useState("");
+  const [selectedShop, setSelectedShop] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('indent_selectedShop');
+      return saved || "";
+    } catch (e) {
+      return "";
+    }
+  });
+
+  useEffect(() => {
+    if (selectedShop) {
+      sessionStorage.setItem('indent_selectedShop', selectedShop);
+    } else {
+      sessionStorage.removeItem('indent_selectedShop');
+    }
+  }, [selectedShop]);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStep, setUploadStep] = useState(1); // 1: Select Shop, 2: Upload File
@@ -799,6 +815,10 @@ const Indent = () => {
   };
 
   const handleIndentSubmit = async () => {
+    if (!selectedShop || selectedShop.trim() === "") {
+      addToast("Shop name is required. Please select a shop before submitting.", "error");
+      return;
+    }
     setIsProcessing(true);
     try {
       const activeItems = [];
@@ -935,8 +955,10 @@ const Indent = () => {
       addToast(`Successfully submitted ${itemsPayload.length} records to Supabase!`, "success");
       setTableData([]);
       setDuplicateCount(0);
+      setSelectedShop("");
       sessionStorage.removeItem('indent_tableData');
       sessionStorage.removeItem('indent_duplicateCount');
+      sessionStorage.removeItem('indent_selectedShop');
       fetchSubmittedHistory();
     } catch (error) {
       console.error("Error submitting indent data:", error);
@@ -1008,8 +1030,10 @@ const Indent = () => {
                 onClick={() => {
                   setTableData([]);
                   setDuplicateCount(0);
+                  setSelectedShop("");
                   sessionStorage.removeItem('indent_tableData');
                   sessionStorage.removeItem('indent_duplicateCount');
+                  sessionStorage.removeItem('indent_selectedShop');
                   addToast("Data cleared successfully", "success");
                 }}
                 className="flex items-center gap-2 bg-white border border-[#e2e8f0] hover:bg-[#fef2f2] hover:border-[#fecaca] text-[#ef4444] px-4 py-2 rounded-lg font-semibold transition-all text-sm"
@@ -1305,7 +1329,9 @@ const Indent = () => {
                 <button
                   onClick={() => {
                     setShowModal(false);
-                    setSelectedShop("");
+                    if (tableData.length === 0) {
+                      setSelectedShop("");
+                    }
                     setUploadStep(1);
                   }}
                   className="p-1 hover:bg-[#f1f5f9] rounded-lg"
