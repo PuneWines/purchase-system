@@ -35,6 +35,7 @@ export const fetchPageData = async () => {
       .select("*")
       .eq("approval_status", "approved")
       .eq("is_excluded", false)
+      .order("id", { ascending: false })
       .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
 
     if (indentError) throw indentError;
@@ -58,6 +59,7 @@ export const fetchPageData = async () => {
     const { data: pageData, error: poError } = await supabase
       .from("purchase_orders")
       .select("indent_id, vendor_name")
+      .order("id", { ascending: false })
       .range(poPage * pageSize, (poPage + 1) * pageSize - 1);
 
     if (poError) throw poError;
@@ -81,6 +83,7 @@ export const fetchPageData = async () => {
     const { data: pageData, error: indentsError } = await supabase
       .from("indents")
       .select("id, shop_name")
+      .order("id", { ascending: false })
       .range(indentsPage * pageSize, (indentsPage + 1) * pageSize - 1);
 
     if (indentsError) throw indentsError;

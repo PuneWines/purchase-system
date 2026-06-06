@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 import { supabase } from "../../utils/supabase";
-import { Loader2, Archive, X, Eye, Search } from "lucide-react";
+import { Loader2, Archive, X, Eye, Search, Trash2 } from "lucide-react";
 
 const Approval = () => {
   const [groupedApprovals, setGroupedApprovals] = useState({});
@@ -62,6 +62,79 @@ const Approval = () => {
       return updated;
     });
   };
+
+  const handleDeleteBatch = async (groupKey, items) => {
+    const displayLabel = groupKey.includes('::') ? groupKey.split('::')[1] : groupKey;
+    const confirmMsg = `Are you sure you want to permanently delete all ${items.length} items in batch ${displayLabel}? This action cannot be undone.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setIsLoading(true);
+      const ids = items.map(item => item.id);
+      const { error } = await supabase
+        .from("indent_items")
+        .delete()
+        .in("id", ids);
+
+      if (error) throw error;
+
+      alert(`Batch ${displayLabel} successfully deleted!`);
+      
+      // Update local state by removing the deleted group
+      setGroupedApprovals(prev => {
+        const updated = { ...prev };
+        delete updated[groupKey];
+        return updated;
+      });
+    } catch (error) {
+      console.error("Error deleting batch:", error);
+      alert("Failed to delete batch.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId, itemName) => {
+    const confirmMsg = `Are you sure you want to permanently delete item "${itemName}"? This action cannot be undone.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from("indent_items")
+        .delete()
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      alert(`Item "${itemName}" successfully deleted!`);
+
+      // Update groupedApprovals state
+      setGroupedApprovals(prev => {
+        const updated = { ...prev };
+        const currentItems = updated[selectedIndentId] || [];
+        const filteredItems = currentItems.filter(item => item.id !== itemId);
+        
+        if (filteredItems.length === 0) {
+          // If no items left in batch, remove the entire batch key and close the modal
+          delete updated[selectedIndentId];
+          setSelectedIndentId(null);
+        } else {
+          updated[selectedIndentId] = filteredItems;
+        }
+        return updated;
+      });
+
+      // Update originalIndentItems snapshot to keep rollback consistent
+      setOriginalIndentItems(prev => prev.filter(item => item.id !== itemId));
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert("Failed to delete item.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const handleOpenIndent = (indentId) => {
     setSelectedIndentId(indentId);
@@ -154,6 +227,7 @@ const Approval = () => {
           .from("indent_items")
           .select("*")
           .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (pageError) throw pageError;
@@ -177,6 +251,7 @@ const Approval = () => {
         const { data: pageData, error: pageError } = await supabase
           .from("indents")
           .select("id, shop_name")
+          .order("id", { ascending: false })
           .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
 
         if (pageError) throw pageError;
@@ -445,51 +520,73 @@ const Approval = () => {
                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8fafc'}
                      onClick={() => handleOpenIndent(groupKey)}
                   >
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleOpenIndent(groupKey); }}
-                        style={{
-                          position: 'relative',
-                          background: '#e0e7ff', // Soft indigo background
-                          border: 'none',
-                          color: '#4338ca', // Darker indigo text
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '6px 16px',
-                          borderRadius: '6px',
-                          fontWeight: '600',
-                          fontSize: '13px',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#c7d2fe'} // Slightly darker soft indigo on hover
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                        title={activeTab === 'pending' ? "Update items" : "View items"}
-                      >
-                        {activeTab === 'pending' ? 'Update' : 'View'}
-                        {activeTab === 'pending' && (
-                          <span style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            right: '-8px',
-                            backgroundColor: '#fee2e2', // Soft red/pink background
-                            color: '#dc2626', // Darker red text
-                            borderRadius: '50%',
-                            width: '20px',
-                            height: '20px',
-                            display: 'flex',
+                    <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center' }}>
+                        <button 
+                          onClick={() => handleOpenIndent(groupKey)}
+                          style={{
+                            position: 'relative',
+                            background: '#e0e7ff', // Soft indigo background
+                            border: 'none',
+                            color: '#4338ca', // Darker indigo text
+                            cursor: 'pointer',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                            border: '1px solid #fca5a5' // Subtle border for definition
-                          }}>
-                            {items.filter(item => !item.is_excluded).length}
-                          </span>
-                        )}
-                      </button>
+                            padding: '6px 16px',
+                            borderRadius: '6px',
+                            fontWeight: '600',
+                            fontSize: '13px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#c7d2fe'} // Slightly darker soft indigo on hover
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e0e7ff'}
+                          title={activeTab === 'pending' ? "Update items" : "View items"}
+                        >
+                          {activeTab === 'pending' ? 'Update' : 'View'}
+                          {activeTab === 'pending' && (
+                            <span style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-8px',
+                              backgroundColor: '#fee2e2', // Soft red/pink background
+                              color: '#dc2626', // Darker red text
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                              border: '1px solid #fca5a5' // Subtle border for definition
+                            }}>
+                              {items.filter(item => !item.is_excluded).length}
+                            </span>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteBatch(groupKey, items)}
+                          style={{
+                            background: '#fee2e2', // Soft red background
+                            border: 'none',
+                            color: '#dc2626', // Dark red text
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '8px',
+                            borderRadius: '6px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fca5a5'} // Slightly darker soft red on hover
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                          title="Delete entire batch"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                     <td style={{ ...tdStyle, color: '#4338ca', fontWeight: '600' }}>{indentDisplayLabel}</td>
                     <td style={tdStyle}>{items[0]?.shop_name || "-"}</td>
@@ -646,6 +743,7 @@ const Approval = () => {
                       <th style={{ ...thStyle, textAlign: 'right' }}>Closing Qty</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>B/Cs</th>
                       <th style={thStyle}>Mls</th>
+                      <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -728,6 +826,28 @@ const Approval = () => {
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.closing_qty || "-"}</td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>{item.bcs || "-"}</td>
                         <td style={tdStyle}>{item.mls || "-"}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDeleteItem(item.id, item.item_name)}
+                            style={{
+                              background: '#fee2e2',
+                              border: 'none',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '8px',
+                              borderRadius: '6px',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fca5a5'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                            title="Delete item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
                       </tr>
                     )})}
                   </tbody>
