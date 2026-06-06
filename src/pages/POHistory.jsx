@@ -17,6 +17,7 @@ import {
   Truck,
 } from "lucide-react";
 import { fetchAllPurchaseOrders } from "../services/poHistoryService";
+import useShopStore from "../store/useShopStore";
 import "../styles/POHistory.css";
 
 const ROWS_PER_PAGE = 20;
@@ -48,7 +49,7 @@ const formatDateTime = (isoString) => {
 const SkeletonRows = ({ count = 8 }) =>
   Array.from({ length: count }).map((_, i) => (
     <tr key={i} className="poh-skeleton-row">
-      {Array.from({ length: 7 }).map((__, j) => (
+      {Array.from({ length: 8 }).map((__, j) => (
         <td key={j}>
           <div
             className="poh-skeleton-cell"
@@ -61,6 +62,7 @@ const SkeletonRows = ({ count = 8 }) =>
 
 /* ── Main Component ──────────────────────────────────────────── */
 const POHistory = () => {
+  const { selectedShop } = useShopStore();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -102,21 +104,28 @@ const POHistory = () => {
   }, [loadOrders]);
 
   /* ── Unique vendor list for filter dropdown ───────────────── */
+  /* ── Filtered by Global Shop Selector ────────────────────── */
+  const shopFilteredOrders = useMemo(() => {
+    if (!selectedShop || selectedShop === "All") return orders;
+    return orders.filter((o) => o.shop_name === selectedShop);
+  }, [orders, selectedShop]);
+
+  /* ── Unique vendor list for filter dropdown ───────────────── */
   const vendorOptions = useMemo(() => {
-    const names = [...new Set(orders.map((o) => o.vendor_name).filter(Boolean))].sort();
+    const names = [...new Set(shopFilteredOrders.map((o) => o.vendor_name).filter(Boolean))].sort();
     return ["All", ...names];
-  }, [orders]);
+  }, [shopFilteredOrders]);
 
   /* ── Filtered + sorted list ───────────────────────────────── */
   const filteredOrders = useMemo(() => {
-    let list = [...orders];
+    let list = [...shopFilteredOrders];
 
     // Vendor filter
     if (vendorFilter !== "All") {
       list = list.filter((o) => o.vendor_name === vendorFilter);
     }
 
-    // Search filter (PO number, vendor, brand, indent id)
+    // Search filter (PO number, vendor, brand, indent id, shop name)
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
@@ -124,7 +133,8 @@ const POHistory = () => {
           (o.po_number || "").toLowerCase().includes(q) ||
           (o.vendor_name || "").toLowerCase().includes(q) ||
           (o.first_brand_name || "").toLowerCase().includes(q) ||
-          (o.indent_id || "").toLowerCase().includes(q)
+          (o.indent_id || "").toLowerCase().includes(q) ||
+          (o.shop_name || "").toLowerCase().includes(q)
       );
     }
 
@@ -150,7 +160,7 @@ const POHistory = () => {
     });
 
     return list;
-  }, [orders, vendorFilter, searchQuery, sortField, sortDir]);
+  }, [shopFilteredOrders, vendorFilter, searchQuery, sortField, sortDir]);
 
   /* ── Pagination ───────────────────────────────────────────── */
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ROWS_PER_PAGE));
@@ -158,7 +168,7 @@ const POHistory = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, vendorFilter, sortField, sortDir]);
+  }, [searchQuery, vendorFilter, sortField, sortDir, selectedShop]);
 
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * ROWS_PER_PAGE;
@@ -167,11 +177,11 @@ const POHistory = () => {
 
   /* ── Stats ────────────────────────────────────────────────── */
   const stats = useMemo(() => {
-    const totalQty = orders.reduce((s, o) => s + (Number(o.total_order_qty) || 0), 0);
-    const totalBox = orders.reduce((s, o) => s + (Number(o.total_order_box) || 0), 0);
-    const vendors = new Set(orders.map((o) => o.vendor_name).filter(Boolean)).size;
-    return { totalPos: orders.length, totalQty, totalBox, vendors };
-  }, [orders]);
+    const totalQty = shopFilteredOrders.reduce((s, o) => s + (Number(o.total_order_qty) || 0), 0);
+    const totalBox = shopFilteredOrders.reduce((s, o) => s + (Number(o.total_order_box) || 0), 0);
+    const vendors = new Set(shopFilteredOrders.map((o) => o.vendor_name).filter(Boolean)).size;
+    return { totalPos: shopFilteredOrders.length, totalQty, totalBox, vendors };
+  }, [shopFilteredOrders]);
 
   /* ── Sort handler ─────────────────────────────────────────── */
   const handleSort = (field) => {
@@ -183,7 +193,7 @@ const POHistory = () => {
     }
   };
 
-  const SortIcon = ({ field }) => {
+  const renderSortIcon = (field) => {
     if (sortField !== field) return <span className="sort-indicator">↕</span>;
     return (
       <span className="sort-indicator">
@@ -315,6 +325,7 @@ const POHistory = () => {
                 <tr>
                   <th>#</th>
                   <th>PO Number</th>
+                  <th>Shop Name</th>
                   <th>Vendor</th>
                   <th>Date</th>
                   <th>Qty / Box</th>
@@ -346,16 +357,19 @@ const POHistory = () => {
                 <tr>
                   <th style={{ width: 50 }}>#</th>
                   <th onClick={() => handleSort("po_number")} className={sortField === "po_number" ? "active-sort" : ""}>
-                    PO Number <SortIcon field="po_number" />
+                    PO Number {renderSortIcon("po_number")}
+                  </th>
+                  <th onClick={() => handleSort("shop_name")} className={sortField === "shop_name" ? "active-sort" : ""}>
+                    Shop Name {renderSortIcon("shop_name")}
                   </th>
                   <th onClick={() => handleSort("vendor_name")} className={sortField === "vendor_name" ? "active-sort" : ""}>
-                    Vendor <SortIcon field="vendor_name" />
+                    Vendor {renderSortIcon("vendor_name")}
                   </th>
                   <th onClick={() => handleSort("created_at")} className={sortField === "created_at" ? "active-sort" : ""}>
-                    Date <SortIcon field="created_at" />
+                    Date {renderSortIcon("created_at")}
                   </th>
                   <th onClick={() => handleSort("total_order_qty")} className={sortField === "total_order_qty" ? "active-sort" : ""}>
-                    Qty / Box <SortIcon field="total_order_qty" />
+                    Qty / Box {renderSortIcon("total_order_qty")}
                   </th>
                   <th>Brand</th>
                   <th>PDF Links</th>
@@ -374,6 +388,9 @@ const POHistory = () => {
                       </td>
                       <td>
                         <span className="poh-po-number">{order.po_number || "—"}</span>
+                      </td>
+                      <td>
+                        <span className="poh-shop-name" style={{ fontWeight: 700, color: "var(--color-primary, #0052cc)" }}>{order.shop_name || "—"}</span>
                       </td>
                       <td>
                         <span className="poh-vendor-name">{order.vendor_name || "—"}</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { 
@@ -69,6 +69,11 @@ const VendorPortal = () => {
   const [formErrors, setFormErrors] = useState({});
   const [successPoIds, setSuccessPoIds] = useState({});
 
+  // Memoized filter for pending purchase orders
+  const pendingPoList = useMemo(() => {
+    return poList.filter(po => po.trader_status !== "yes" && po.trader_status !== "no" && !successPoIds[po.id]);
+  }, [poList, successPoIds]);
+
   // Refs for PDF off-screen rendering
   const offscreenRef = useRef(null);
   const [pdfData, setPdfData] = useState(null);
@@ -99,12 +104,12 @@ const VendorPortal = () => {
 
       setVendorName(vendorRow.party_name);
 
-      // 3. Fetch POs matching this vendor name where receiver has not finished confirmation
+      // 3. Fetch POs matching this vendor name where vendor has not finished confirmation (trader_status is pending)
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("vendor_name", vendorRow.party_name)
-        .or("receiver_status.is.null,receiver_status.eq.")
+        .or("trader_status.is.null,trader_status.eq.")
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
@@ -458,7 +463,7 @@ const VendorPortal = () => {
         )}
 
         {/* PO List */}
-        {poList.length === 0 ? (
+        {pendingPoList.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm flex flex-col items-center justify-center">
             <ShoppingBag size={48} className="text-slate-400 mb-4" />
             <h3 className="text-lg font-bold text-slate-800 mb-1">No Purchase Orders Found</h3>
@@ -466,7 +471,7 @@ const VendorPortal = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {poList.map((po) => {
+            {pendingPoList.map((po) => {
               const isExpanded = expandedPoId === po.id;
               const isSubmitted = po.trader_status === "yes";
               const isRejected = po.trader_status === "no";

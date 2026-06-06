@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { 
@@ -39,6 +39,11 @@ const TransporterPortal = () => {
   const [formErrors, setFormErrors] = useState({});
   const [successPoIds, setSuccessPoIds] = useState({});
 
+  // Memoized filter for pending shipments
+  const pendingPoList = useMemo(() => {
+    return poList.filter(po => po.transporter_status !== "yes" && po.transporter_status !== "no" && !successPoIds[po.id]);
+  }, [poList, successPoIds]);
+
   // Fetch Transporter details and purchase orders
   const fetchPortalData = async () => {
     try {
@@ -58,12 +63,12 @@ const TransporterPortal = () => {
       }
       setTransporter(transp);
 
-      // 2. Fetch pending POs for this transporter where receiver has not finished confirmation
+      // 2. Fetch pending POs for this transporter (transporter_status is pending)
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("transporter_number", transp.contact_number)
-        .or("receiver_status.is.null,receiver_status.eq.")
+        .or("transporter_status.is.null,transporter_status.eq.")
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
@@ -341,7 +346,7 @@ const TransporterPortal = () => {
         )}
 
         {/* PO List */}
-        {poList.length === 0 ? (
+        {pendingPoList.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm flex flex-col items-center justify-center">
             <Truck size={48} className="text-slate-400 mb-4" />
             <h3 className="text-lg font-bold text-slate-800 mb-1">No Shipments Assigned</h3>
@@ -349,7 +354,7 @@ const TransporterPortal = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {poList.map((po) => {
+            {pendingPoList.map((po) => {
               const isExpanded = expandedPoId === po.id;
               const isSubmitted = po.transporter_status === "yes";
               const isRejected = po.transporter_status === "no";

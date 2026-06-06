@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../../utils/supabase";
 import { 
@@ -34,6 +34,11 @@ const ReceiverPortal = () => {
   const [submittingPoId, setSubmittingPoId] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [successPoIds, setSuccessPoIds] = useState({});
+
+  // Memoized filter for pending receiver confirmations
+  const pendingPoList = useMemo(() => {
+    return poList.filter(po => po.receiver_status !== "yes" && po.receiver_status !== "no" && !successPoIds[po.id]);
+  }, [poList, successPoIds]);
 
   // Fetch Receiver details and purchase orders
   const fetchPortalData = async () => {
@@ -363,7 +368,7 @@ const ReceiverPortal = () => {
         </div>
 
         {/* PO List */}
-        {poList.length === 0 ? (
+        {pendingPoList.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm flex flex-col items-center justify-center">
             <Package size={48} className="text-slate-400 mb-4" />
             <h3 className="text-lg font-bold text-slate-800 mb-1">No Pending Deliveries</h3>
@@ -392,7 +397,7 @@ const ReceiverPortal = () => {
               </div>
             )}
 
-            {poList.map((po) => {
+            {pendingPoList.map((po) => {
               const isExpanded = expandedPoId === po.id;
               const isSubmitted = po.receiver_status === "yes";
               const isRejected = po.receiver_status === "no";
