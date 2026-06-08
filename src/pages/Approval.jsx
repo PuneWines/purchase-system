@@ -25,13 +25,15 @@ const Approval = () => {
 
   const handleStatusChange = (itemId, status) => {
     if (status === 'approved' && indentStatuses[itemId] !== 'approved') {
-      // Automatically apply 'approved' to all items in the current modal
+      // Automatically apply 'approved' to all non-excluded items in the current modal
       setIndentStatuses(prev => {
         const currentItems = groupedApprovals[selectedIndentId] || [];
         const newStatuses = { ...prev };
         currentItems.forEach((item, idx) => {
           const id = item.id || idx;
-          newStatuses[id] = 'approved';
+          if (!item.is_excluded) {
+            newStatuses[id] = 'approved';
+          }
         });
         return newStatuses;
       });
@@ -242,6 +244,41 @@ const Approval = () => {
         }
       }
 
+      // Fetch all approved indent items paginated from approved_indent_items
+      let allApprovedIndentItems = [];
+      let approvedPage = 0;
+      let approvedHasMore = true;
+
+      while (approvedHasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("approved_indent_items")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
+
+        if (pageError) throw pageError;
+        if (pageData && pageData.length > 0) {
+          allApprovedIndentItems = [...allApprovedIndentItems, ...pageData];
+          approvedPage++;
+          if (pageData.length < pageSize) {
+            approvedHasMore = false;
+          }
+        } else {
+          approvedHasMore = false;
+        }
+      }
+
+      // Map approved items to have approval_status = 'approved' and is_excluded = false for UI compatibility
+      const mappedApproved = allApprovedIndentItems.map(item => ({
+        ...item,
+        approval_status: "approved",
+        is_excluded: false
+      }));
+
+      // Combine both lists
+      const combinedItems = [...allIndentItems, ...mappedApproved];
+
       // Fetch all indents paginated to resolve shop_name
       let allIndents = [];
       let indentPage = 0;
@@ -271,7 +308,7 @@ const Approval = () => {
         return acc;
       }, {});
 
-      const enriched = (allIndentItems || []).map(item => ({
+      const enriched = (combinedItems || []).map(item => ({
         ...item,
         shop_name: shopMap[item.indent_id] || "Unknown"
       }));
@@ -319,25 +356,30 @@ const Approval = () => {
       setIsLoading(true);
       const currentItems = groupedApprovals[selectedIndentId] || [];
       
-      // Filter items to update: either they have a status set in indentStatuses, or they are no longer excluded
-      const itemsToUpdate = currentItems.filter(item => indentStatuses[item.id] || !item.is_excluded);
-
-      if (itemsToUpdate.length === 0) {
-        alert("No approvals or rejections selected to submit.");
+      if (currentItems.length === 0) {
+        alert("No items in this batch to submit.");
         setIsLoading(false);
         return;
       }
 
-      // Batch update the items in Supabase with persistent rounding logic
-      const promises = itemsToUpdate.map(item => {
+      const approvedItemsPayload = [];
+      const idsToDelete = [];
+      let parentIndentId = null;
+      let hasAnyApproved = false;
+
+      currentItems.forEach(item => {
+        idsToDelete.push(item.id);
+        if (!parentIndentId && item.indent_id) {
+          parentIndentId = item.indent_id;
+        }
+
         const status = indentStatuses[item.id] || 'pending';
         let processedBox = parseFloat(item.order_box) || 0;
         let processedQty = parseFloat(item.order_qty) || 0;
 
-        if (status === 'approved') {
+        if (status === 'approved' && !item.is_excluded) {
+          hasAnyApproved = true;
           if (processedBox >= 0.90) {
-            // Any quantity >= 0.90 is rounded to boxes:
-            // e.g. 0.91 -> 1, 1.24 -> 1 (round down to nearest whole number, but minimum is 1)
             if (processedBox < 1.0) {
               processedBox = 1;
             } else {
@@ -346,36 +388,63 @@ const Approval = () => {
             const bcs = parseFloat(item.bcs) || 0;
             processedQty = bcs > 0 ? processedBox * bcs : processedQty;
           }
-        }
 
-        return supabase
-          .from("indent_items")
-          .update({ 
-            approval_status: status,
-            unique_indent_id: selectedIndentId,
+          approvedItemsPayload.push({
+            original_item_id: item.id,
+            indent_id: item.indent_id,
+            party_indent_id: item.party_indent_id,
+            item_name: item.item_name,
+            brand_name: item.brand_name,
+            bcs: item.bcs,
+            mls: item.mls,
+            liquor_type: item.liquor_type,
+            party_name: item.party_name,
+            qty_out: item.qty_out,
+            closing_qty: item.closing_qty,
+            last_month_sale_box: item.last_month_sale_box,
+            per_day_sale_last_month: item.per_day_sale_last_month,
+            threshold_sale: item.threshold_sale,
+            closing_qty_box: item.closing_qty_box,
             order_box: processedBox,
             order_qty: processedQty,
-            is_excluded: item.is_excluded
-          })
-          .eq("id", item.id);
+            unique_indent_id: selectedIndentId,
+            po_status: 'pending'
+          });
+        }
       });
 
-      const results = await Promise.all(promises);
-      const errors = results.filter(r => r.error);
-
-      if (errors.length > 0) {
-        console.error("Some updates failed:", errors);
-        alert("Failed to submit some approvals. Check console for details.");
-      } else {
-        alert("Successfully submitted approvals to Supabase!");
-        setOriginalIndentItems([]);
-        setOriginalStatuses(null);
-        setSelectedIndentId(null);
-        fetchApprovals();
+      // 1. Insert approved items into approved_indent_items
+      if (approvedItemsPayload.length > 0) {
+        const { error: insertErr } = await supabase
+          .from("approved_indent_items")
+          .insert(approvedItemsPayload);
+        if (insertErr) throw insertErr;
       }
+
+      // 2. Update parent indent status
+      if (parentIndentId) {
+        const { error: indentErr } = await supabase
+          .from("indents")
+          .update({ status: hasAnyApproved ? "Approved" : "Rejected" })
+          .eq("id", parentIndentId);
+        if (indentErr) throw indentErr;
+      }
+
+      // 3. Delete all items in this batch from indent_items
+      const { error: deleteErr } = await supabase
+        .from("indent_items")
+        .delete()
+        .in("id", idsToDelete);
+      if (deleteErr) throw deleteErr;
+
+      alert("Successfully submitted approvals and deleted batch from pending storage!");
+      setOriginalIndentItems([]);
+      setOriginalStatuses(null);
+      setSelectedIndentId(null);
+      fetchApprovals();
     } catch (error) {
       console.error("Error submitting approvals:", error);
-      alert("Failed to submit approvals.");
+      alert("Failed to submit approvals: " + error.message);
     } finally {
       setIsLoading(false);
     }

@@ -22,7 +22,8 @@ import {
   getOrCreateTransporterPortalLink,
   getOrCreateReceiverPortalLink,
   excludeIndentItems,
-  deleteIndentAfterPO
+  deleteIndentAfterPO,
+  markApprovedItemsAsOrdered
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
 import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
@@ -321,17 +322,15 @@ const PurchaseOrder = () => {
 
       const insertedPoId = insertedData[0]?.id;
 
-      // --- Delete all indent_items for this batch now that PO is created ---
-      // This removes both approved and excluded items linked to the same unique_indent_id.
-      // Non-fatal: if deletion fails the PO is already saved safely.
-      if (currentIndentId) {
+      // --- Mark approved items as ordered in approved_indent_items now that PO is created ---
+      if (currentIndentId && insertedPoId) {
         try {
-          await deleteIndentAfterPO(currentIndentId);
-          console.log("✅ Indent items deleted after PO creation:", currentIndentId);
-        } catch (delError) {
-          console.error("⚠️ PO created but failed to delete indent items:", delError);
+          await markApprovedItemsAsOrdered(currentIndentId, activeParty, insertedPoId);
+          console.log("✅ Approved items marked as ordered after PO creation:", currentIndentId);
+        } catch (statusError) {
+          console.error("⚠️ PO created but failed to update status of approved items:", statusError);
           addToast(
-            "PO created successfully, but failed to clean up indent data. Please delete manually.",
+            "PO created successfully, but failed to update status of approved items. Please verify manually.",
             "warning"
           );
         }

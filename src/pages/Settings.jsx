@@ -99,14 +99,21 @@ const Settings = () => {
 
 
   const fetchAvailableParties = async () => {
-    const { data, error } = await supabase
-      .from("indent_items")
-      .select("party_name")
-      .not("party_name", "is", null);
-      
-    if (!error && data) {
-      const uniqueParties = [...new Set(data.map(d => d.party_name).filter(Boolean))];
+    try {
+      const [res1, res2] = await Promise.all([
+        supabase.from("indent_items").select("party_name").not("party_name", "is", null),
+        supabase.from("approved_indent_items").select("party_name").not("party_name", "is", null)
+      ]);
+
+      const combined = [
+        ...(res1.data || []),
+        ...(res2.data || [])
+      ];
+
+      const uniqueParties = [...new Set(combined.map(d => d.party_name).filter(Boolean))];
       setAvailableParties(uniqueParties);
+    } catch (error) {
+      console.error("Error fetching available parties:", error);
     }
   };
 

@@ -22,13 +22,15 @@ const TraderVerification = () => {
         // Collect all unique indent_ids from the POs
         const uniqueIndentIds = [...new Set(poData.map(po => po.indent_id).filter(Boolean))];
 
-        // Fetch only the indent_items rows that match these unique_indent_ids
-        const { data: items } = uniqueIndentIds.length > 0
-          ? await supabase
-              .from("indent_items")
-              .select("indent_id, unique_indent_id")
-              .in("unique_indent_id", uniqueIndentIds)
-          : { data: [] };
+        // Fetch only the indent_items and approved_indent_items rows that match these unique_indent_ids
+        let items = [];
+        if (uniqueIndentIds.length > 0) {
+          const [resItems, resApproved] = await Promise.all([
+            supabase.from("indent_items").select("indent_id, unique_indent_id").in("unique_indent_id", uniqueIndentIds),
+            supabase.from("approved_indent_items").select("indent_id, unique_indent_id").in("unique_indent_id", uniqueIndentIds)
+          ]);
+          items = [...(resItems.data || []), ...(resApproved.data || [])];
+        }
 
         // Build map: unique_indent_id (text) → indent_id (UUID)
         const itemMap = (items || []).reduce((acc, item) => {

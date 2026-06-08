@@ -24,23 +24,28 @@ export const fetchNextPoNumber = async () => {
 export const fetchPageData = async () => {
   const pageSize = 1000;
 
-  // Fetch approved indent items paginated
+  // Fetch approved indent items paginated from approved_indent_items
   let indentData = [];
   let indentPage = 0;
   let indentHasMore = true;
 
   while (indentHasMore) {
     const { data: pageData, error: indentError } = await supabase
-      .from("indent_items")
+      .from("approved_indent_items")
       .select("*")
-      .eq("approval_status", "approved")
-      .eq("is_excluded", false)
+      .eq("po_status", "pending")
       .order("id", { ascending: false })
       .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
 
     if (indentError) throw indentError;
     if (pageData && pageData.length > 0) {
-      indentData = [...indentData, ...pageData];
+      // Map for backward compatibility with frontend code expecting approval_status & is_excluded
+      const mappedData = pageData.map(item => ({
+        ...item,
+        approval_status: "approved",
+        is_excluded: false
+      }));
+      indentData = [...indentData, ...mappedData];
       indentPage++;
       if (pageData.length < pageSize) {
         indentHasMore = false;
@@ -207,30 +212,38 @@ export const getOrCreateReceiverPortalLink = async (selectedReceiver, receivers,
 
 export const excludeIndentItems = async (ids, reason) => {
   const { data, error } = await supabase
-    .from("indent_items")
-    .update({ is_excluded: true, exclusion_reason: reason })
+    .from("approved_indent_items")
+    .update({ po_status: "excluded", exclusion_reason: reason })
     .in("id", ids)
     .select();
 
   if (error) throw error;
-  return data;
+  return (data || []).map(item => ({
+    ...item,
+    is_excluded: true,
+    exclusion_reason: reason
+  }));
 };
 
 /**
- * Delete all indent_items belonging to a specific unique_indent_id (group key)
- * after a PO has been successfully created.
- * This removes both approved (non-excluded) and excluded items in the batch.
- * The parent `indents` row is intentionally left in place (Option A).
- *
- * @param {string} uniqueIndentId - The scoped group key (e.g. "<indent_uuid>::IN-1")
+ * Mark approved items as ordered in approved_indent_items table.
  */
-export const deleteIndentAfterPO = async (uniqueIndentId) => {
-  if (!uniqueIndentId) return;
+export const markApprovedItemsAsOrdered = async (uniqueIndentId, vendorName, poId) => {
+  if (!uniqueIndentId || !vendorName || !poId) return;
 
   const { error } = await supabase
-    .from("indent_items")
-    .delete()
-    .eq("unique_indent_id", uniqueIndentId);
+    .from("approved_indent_items")
+    .update({ po_status: "ordered", po_id: poId })
+    .eq("unique_indent_id", uniqueIndentId)
+    .eq("party_name", vendorName);
 
   if (error) throw error;
+};
+
+/**
+ * Deprecated: deleteIndentAfterPO is a no-op now because items are deleted from indent_items
+ * immediately after approval, and archived to approved_indent_items.
+ */
+export const deleteIndentAfterPO = async (uniqueIndentId) => {
+  console.log("deleteIndentAfterPO called (no-op). Items are managed via approved_indent_items.");
 };

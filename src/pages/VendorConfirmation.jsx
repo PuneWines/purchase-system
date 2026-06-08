@@ -39,11 +39,21 @@ const VendorConfirmation = () => {
         // Fetch shop name dynamically to support conditional transporter bypass
         let resolvedShopName = "Unknown";
         if (data.indent_id) {
-          const { data: itemData } = await supabase
-            .from("indent_items")
+          let { data: itemData } = await supabase
+            .from("approved_indent_items")
             .select("indent_id")
             .eq("unique_indent_id", data.indent_id)
             .limit(1);
+
+          if (!itemData || itemData.length === 0) {
+            const { data: fallbackData } = await supabase
+              .from("indent_items")
+              .select("indent_id")
+              .eq("unique_indent_id", data.indent_id)
+              .limit(1);
+            itemData = fallbackData;
+          }
+
           if (itemData && itemData.length > 0 && itemData[0].indent_id) {
             const { data: indentData } = await supabase
               .from("indents")

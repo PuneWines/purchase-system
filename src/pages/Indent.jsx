@@ -266,8 +266,41 @@ const Indent = () => {
         }
       }
 
+      // Fetch all approved indent items for these indents paginated
+      let allApprovedItems = [];
+      let approvedPage = 0;
+      let approvedHasMore = true;
+
+      while (approvedHasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("approved_indent_items")
+          .select("indent_id")
+          .in("indent_id", indentIds)
+          .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
+
+        if (pageError) throw pageError;
+        if (pageData && pageData.length > 0) {
+          allApprovedItems = [...allApprovedItems, ...pageData];
+          approvedPage++;
+          if (pageData.length < pageSize) {
+            approvedHasMore = false;
+          }
+        } else {
+          approvedHasMore = false;
+        }
+      }
+
+      // Map approved items to have is_excluded = false (they are non-excluded approved indents)
+      const mappedApproved = allApprovedItems.map(item => ({
+        ...item,
+        is_excluded: false
+      }));
+
+      // Combine both lists
+      const combinedItems = [...allItems, ...mappedApproved];
+
       // Group items by indent_id
-      const itemsByIndent = allItems.reduce((acc, item) => {
+      const itemsByIndent = combinedItems.reduce((acc, item) => {
         if (!acc[item.indent_id]) {
           acc[item.indent_id] = [];
         }
@@ -614,7 +647,41 @@ const Indent = () => {
           hasMore = false;
         }
       }
-      setSelectedSubmissionItems(allItems);
+
+      // Fetch approved items from approved_indent_items
+      let allApprovedItems = [];
+      let approvedPage = 0;
+      let approvedHasMore = true;
+
+      while (approvedHasMore) {
+        const { data, error } = await supabase
+          .from('approved_indent_items')
+          .select('*')
+          .eq('indent_id', history.id)
+          .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allApprovedItems = [...allApprovedItems, ...data];
+          approvedPage++;
+          if (data.length < pageSize) {
+            approvedHasMore = false;
+          }
+        } else {
+          approvedHasMore = false;
+        }
+      }
+
+      // Combine both lists, mapping approved items for UI compatibility
+      const combined = [
+        ...allItems,
+        ...allApprovedItems.map(item => ({
+          ...item,
+          approval_status: 'approved',
+          is_excluded: false
+        }))
+      ];
+      setSelectedSubmissionItems(combined);
     } catch (error) {
       console.error("Error fetching details:", error);
       addToast("Failed to load submission details.", "error");
@@ -704,12 +771,32 @@ const Indent = () => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
     try {
-      const { data: itemData, error: itemError } = await supabase
+      let itemData = null;
+      let isApprovedItem = false;
+
+      const { data: pendingItem, error: pendingError } = await supabase
         .from('indent_items')
         .select('*')
         .eq('id', itemId)
-        .single();
-      if (itemError) throw itemError;
+        .maybeSingle();
+
+      if (pendingItem) {
+        itemData = pendingItem;
+      } else {
+        const { data: approvedItem, error: approvedError } = await supabase
+          .from('approved_indent_items')
+          .select('*')
+          .eq('id', itemId)
+          .maybeSingle();
+        if (approvedItem) {
+          itemData = approvedItem;
+          isApprovedItem = true;
+        }
+      }
+
+      if (!itemData) {
+        throw new Error("Item not found in any repository.");
+      }
 
       const uniqueIndentId = itemData.unique_indent_id;
       const vendorName = itemData.party_name;
@@ -724,12 +811,12 @@ const Indent = () => {
         if (!poError && poData && poData.length > 0) {
           const po = poData[0];
 
+          // Check other approved items for this vendor
           const { data: otherItems } = await supabase
-            .from('indent_items')
+            .from('approved_indent_items')
             .select('id')
             .eq('unique_indent_id', uniqueIndentId)
-            .eq('party_name', vendorName)
-            .eq('approval_status', 'approved');
+            .eq('party_name', vendorName);
 
           const remaining = (otherItems || []).filter(i => i.id !== itemId);
 
@@ -769,16 +856,24 @@ const Indent = () => {
         }
       }
 
-      const { error: delItemError } = await supabase
-        .from('indent_items')
-        .delete()
-        .eq('id', itemId);
-      if (delItemError) throw delItemError;
+      if (isApprovedItem) {
+        const { error: delItemError } = await supabase
+          .from('approved_indent_items')
+          .delete()
+          .eq('id', itemId);
+        if (delItemError) throw delItemError;
+      } else {
+        const { error: delItemError } = await supabase
+          .from('indent_items')
+          .delete()
+          .eq('id', itemId);
+        if (delItemError) throw delItemError;
+      }
 
       addToast("Successfully deleted item from indent.", "success");
 
       if (selectedSubmission?.id === indentId) {
-        let allRefreshed = [];
+        let remainingPending = [];
         let page = 0;
         const pageSize = 1000;
         let hasMore = true;
@@ -793,7 +888,7 @@ const Indent = () => {
 
           if (refError) throw refError;
           if (refreshedItems && refreshedItems.length > 0) {
-            allRefreshed = [...allRefreshed, ...refreshedItems];
+            remainingPending = [...remainingPending, ...refreshedItems];
             page++;
             if (refreshedItems.length < pageSize) {
               hasMore = false;
@@ -802,7 +897,39 @@ const Indent = () => {
             hasMore = false;
           }
         }
-        setSelectedSubmissionItems(allRefreshed || []);
+
+        let remainingApproved = [];
+        let approvedPage = 0;
+        let approvedHasMore = true;
+
+        while (approvedHasMore) {
+          const { data: refreshedItems, error: refError } = await supabase
+            .from('approved_indent_items')
+            .select('*')
+            .eq('indent_id', indentId)
+            .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
+
+          if (refError) throw refError;
+          if (refreshedItems && refreshedItems.length > 0) {
+            remainingApproved = [...remainingApproved, ...refreshedItems];
+            approvedPage++;
+            if (refreshedItems.length < pageSize) {
+              approvedHasMore = false;
+            }
+          } else {
+            approvedHasMore = false;
+          }
+        }
+
+        const combined = [
+          ...remainingPending,
+          ...remainingApproved.map(item => ({
+            ...item,
+            approval_status: 'approved',
+            is_excluded: false
+          }))
+        ];
+        setSelectedSubmissionItems(combined);
       }
 
       fetchSubmittedHistory();

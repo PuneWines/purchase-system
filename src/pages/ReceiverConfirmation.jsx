@@ -40,14 +40,13 @@ const ReceiverConfirmation = () => {
           }
         }
 
-        // Fetch Order Items from indent_items
+        // Fetch Order Items from approved_indent_items
         if (po.indent_id && po.vendor_name) {
           const { data: itemsData, error: itemsErr } = await supabase
-            .from("indent_items")
+            .from("approved_indent_items")
             .select("*")
-            .eq("unique_indent_id", po.indent_id)
-            .eq("approval_status", "approved")
-            .eq("is_excluded", false); // fetch approved items for this indent
+            .or(`po_id.eq.${po.id},unique_indent_id.eq.${po.indent_id}`)
+            .neq("po_status", "excluded");
 
           if (!itemsErr && itemsData) {
             const filtered = itemsData

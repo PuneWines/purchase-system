@@ -19,9 +19,13 @@ const TransporterVerification = () => {
         .order("created_at", { ascending: false });
 
       if (poData) {
-        // Fetch indents and indent_items to resolve shop_name
+        // Fetch indents, indent_items, and approved_indent_items to resolve shop_name
         const { data: indents } = await supabase.from("indents").select("id, shop_name");
-        const { data: items } = await supabase.from("indent_items").select("indent_id, unique_indent_id");
+        const [resItems, resApproved] = await Promise.all([
+          supabase.from("indent_items").select("indent_id, unique_indent_id"),
+          supabase.from("approved_indent_items").select("indent_id, unique_indent_id")
+        ]);
+        const items = [...(resItems.data || []), ...(resApproved.data || [])];
 
         const indentMap = (indents || []).reduce((acc, ind) => {
           acc[ind.id] = ind.shop_name;

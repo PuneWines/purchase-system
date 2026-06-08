@@ -190,13 +190,12 @@ const VendorPortal = () => {
     try {
       setLoadingItems(prev => ({ ...prev, [po.id]: true }));
 
-      // Fetch from indent_items
+      // Fetch from approved_indent_items
       const { data: items, error: itemsError } = await supabase
-        .from("indent_items")
+        .from("approved_indent_items")
         .select("*")
-        .eq("unique_indent_id", po.indent_id)
-        .eq("approval_status", "approved")
-        .eq("is_excluded", false);
+        .or(`po_id.eq.${po.id},unique_indent_id.eq.${po.indent_id}`)
+        .neq("po_status", "excluded");
 
       if (itemsError) throw itemsError;
 

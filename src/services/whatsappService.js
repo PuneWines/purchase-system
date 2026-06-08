@@ -542,11 +542,21 @@ const resolveShopName = async (poNumber) => {
     
     if (poRes && poRes.length > 0 && poRes[0].indent_id) {
       const uniqueIndentId = poRes[0].indent_id;
-      const { data: itemRes } = await supabase
-        .from("indent_items")
+      const { data: itemResApproved } = await supabase
+        .from("approved_indent_items")
         .select("indent_id")
         .eq("unique_indent_id", uniqueIndentId)
         .limit(1);
+        
+      let itemRes = itemResApproved;
+      if (!itemRes || itemRes.length === 0) {
+        const { data: itemResActive } = await supabase
+          .from("indent_items")
+          .select("indent_id")
+          .eq("unique_indent_id", uniqueIndentId)
+          .limit(1);
+        itemRes = itemResActive;
+      }
         
       if (itemRes && itemRes.length > 0 && itemRes[0].indent_id) {
         const parentIndentId = itemRes[0].indent_id;

@@ -62,6 +62,26 @@ const Dashboard = () => {
         .order("created_at", { ascending: false });
       if (itemsError) throw itemsError;
 
+      // Fetch approved indent items
+      const { data: approvedItemsData, error: approvedItemsError } = await supabase
+        .from("approved_indent_items")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (approvedItemsError) throw approvedItemsError;
+
+      // Map approved items to look like indent_items with 'approved' status and non-excluded
+      const mappedApprovedItems = (approvedItemsData || []).map(item => ({
+        ...item,
+        approval_status: "approved",
+        is_excluded: false
+      }));
+
+      // Combine both lists
+      const combinedIndentItems = [
+        ...(itemsData || []),
+        ...mappedApprovedItems
+      ];
+
       // 3. Fetch purchase orders
       const { data: posData, error: posError } = await supabase
         .from("purchase_orders")
@@ -70,7 +90,7 @@ const Dashboard = () => {
       if (posError) throw posError;
 
       setRawIndents(indentsData || []);
-      setRawIndentItems(itemsData || []);
+      setRawIndentItems(combinedIndentItems || []);
       setRawPurchaseOrders(posData || []);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
