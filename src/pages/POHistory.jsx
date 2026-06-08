@@ -396,7 +396,7 @@ const POHistory = () => {
                               fontWeight: "700",
                               color: "#d97706",
                               backgroundColor: "#fef3c7",
-                              border: "1px solid #fde68a",
+                              border: "1px solid  #fde68a",
                               padding: "2px 6px",
                               borderRadius: "4px",
                               textTransform: "uppercase",
