@@ -25,7 +25,15 @@ const PurchaseOrderPreview = ({
   setSelectedReceiver,
   shippingError,
   onRemoveItem,
-  onDeleteVendor
+  onDeleteVendor,
+  poMode,
+  newItemName,
+  setNewItemName,
+  newItemBox,
+  setNewItemBox,
+  newItemQty,
+  setNewItemQty,
+  onAddItem
 }) => {
   const isKunalShop = items.some(
     item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL"
@@ -57,6 +65,99 @@ const PurchaseOrderPreview = ({
         isReceiver={false}
         onRemoveItem={onRemoveItem}
       />
+
+      {poMode === "manual" && partyName && (
+        <div className="manual-item-form no-print" style={{
+          marginTop: '20px',
+          padding: '20px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+          marginBottom: '20px'
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#1e293b', fontWeight: '600' }}>Add Manual Item</h3>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '2 1 200px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Item Name</label>
+              <input
+                type="text"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="Enter item name"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ flex: '1 1 100px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Box Qty</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={newItemBox}
+                onChange={(e) => setNewItemBox(e.target.value)}
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ flex: '1 1 100px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Bottle Qty</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={newItemQty}
+                onChange={(e) => setNewItemQty(e.target.value)}
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <button
+              onClick={onAddItem}
+              style={{
+                padding: '9px 24px',
+                backgroundColor: '#4338ca',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                height: '37px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3730a3'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4338ca'}
+            >
+              + Add Item
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="po-footer-section">
         <POTerms

@@ -7,18 +7,19 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function check() {
   const { data: pos, error } = await supabase
     .from('purchase_orders')
-    .select('po_number, po_items')
-    .limit(2);
+    .select('*')
+    .limit(1);
     
   if (error) {
     console.error(error);
     return;
   }
   
-  pos.forEach(po => {
-    console.log(`PO: ${po.po_number}`);
-    console.log(JSON.stringify(po.po_items, null, 2));
-  });
+  if (pos && pos.length > 0) {
+    console.log('Columns and values for first PO:', pos[0]);
+  } else {
+    console.log('No POs found');
+  }
 }
 
 check();

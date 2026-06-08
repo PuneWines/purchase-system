@@ -442,6 +442,11 @@ const ReceiverPortal = () => {
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-semibold">
                         {totalQty} Qty
                       </span>
+                      {totalBox > 0 && (
+                        <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-semibold">
+                          {totalBox} Boxes
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">

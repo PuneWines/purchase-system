@@ -124,3 +124,10 @@ WHERE approval_status = 'approved' AND is_excluded = false;
 DELETE FROM public.indent_items ii
 USING public.purchase_orders po
 WHERE ii.unique_indent_id = po.indent_id;
+
+
+-- ====================================================================
+-- 3. MANUAL PO SUPPORT: Add po_type column to purchase_orders table
+-- ====================================================================
+
+ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS po_type text NOT NULL DEFAULT 'system_po'::text;

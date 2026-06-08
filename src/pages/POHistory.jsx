@@ -125,7 +125,7 @@ const POHistory = () => {
       list = list.filter((o) => o.vendor_name === vendorFilter);
     }
 
-    // Search filter (PO number, vendor, brand, indent id, shop name)
+    // Search filter (PO number, vendor, brand, indent id, shop name, or type)
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
@@ -134,7 +134,8 @@ const POHistory = () => {
           (o.vendor_name || "").toLowerCase().includes(q) ||
           (o.first_brand_name || "").toLowerCase().includes(q) ||
           (o.indent_id || "").toLowerCase().includes(q) ||
-          (o.shop_name || "").toLowerCase().includes(q)
+          (o.shop_name || "").toLowerCase().includes(q) ||
+          (q === "manual" && o.po_type === "manual_po")
       );
     }
 
@@ -387,7 +388,24 @@ const POHistory = () => {
                         {rowNum}
                       </td>
                       <td>
-                        <span className="poh-po-number">{order.po_number || "—"}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span className="poh-po-number">{order.po_number || "—"}</span>
+                          {order.po_type === "manual_po" && (
+                            <span className="poh-manual-badge" style={{
+                              fontSize: "0.65rem",
+                              fontWeight: "700",
+                              color: "#d97706",
+                              backgroundColor: "#fef3c7",
+                              border: "1px solid #fde68a",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px"
+                            }}>
+                              M
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <span className="poh-shop-name" style={{ fontWeight: 700, color: "var(--color-primary, #0052cc)" }}>{order.shop_name || "—"}</span>

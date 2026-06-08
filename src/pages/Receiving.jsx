@@ -85,20 +85,35 @@ const Receiving = () => {
 
         setData(enrichedPoData);
 
-        // 2. Fetch approved indent items associated with the PO indents
+        // 2. Fetch approved indent items associated with the POs
+        const poIds = poData.map(po => po.id).filter(Boolean);
         const indentIds = poData.map(po => po.indent_id).filter(Boolean);
-        if (indentIds.length > 0) {
-          const { data: items, error: itemsError } = await supabase
-            .from("approved_indent_items")
-            .select("*")
-            .in("unique_indent_id", indentIds)
-            .neq("po_status", "excluded");
 
-          if (itemsError) throw itemsError;
-          setItemsData(items || []);
-        } else {
-          setItemsData([]);
+        const promises = [];
+        if (poIds.length > 0) {
+          promises.push(
+            supabase.from("approved_indent_items").select("*").in("po_id", poIds).neq("po_status", "excluded")
+          );
         }
+        if (indentIds.length > 0) {
+          promises.push(
+            supabase.from("approved_indent_items").select("*").in("unique_indent_id", indentIds).neq("po_status", "excluded")
+          );
+        }
+
+        const results = await Promise.all(promises);
+        const allItemsMap = new Map();
+
+        results.forEach(res => {
+          if (res.error) throw res.error;
+          if (res.data) {
+            res.data.forEach(item => {
+              allItemsMap.set(item.id, item);
+            });
+          }
+        });
+
+        setItemsData(Array.from(allItemsMap.values()));
       } else {
         setData([]);
         setItemsData([]);
@@ -115,13 +130,49 @@ const Receiving = () => {
     fetchData();
   }, []);
 
-  // Helper to resolve items for a PO based on unique_indent_id and vendor_name
+  // Helper to resolve items for a PO
   const getPoItemsData = (po) => {
+    // 1. Try to load from po.po_items primarily
+    let poItemsList = po.po_items;
+    if (typeof poItemsList === "string") {
+      try {
+        poItemsList = JSON.parse(poItemsList);
+      } catch (e) {
+        console.error("Failed to parse po_items string:", e);
+        poItemsList = null;
+      }
+    }
+
+    if (poItemsList && Array.isArray(poItemsList) && poItemsList.length > 0) {
+      return poItemsList.map(item => {
+        const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : parseFloat(item.order_qty || 0);
+        const itemName = item.itemName || item.item_name;
+        const brandName = item.brandName || item.brand_name || itemName;
+        const closingQty = item.closingQty !== undefined ? item.closingQty : (item.closing_qty !== undefined ? item.closing_qty : "—");
+        const bcs = item.bcs ? parseFloat(item.bcs) : null;
+        
+        // Determine received qty stored in database
+        const dbReceivedQty = po.received_items?.[item.id]?.receivedQty !== undefined
+          ? Number(po.received_items[item.id].receivedQty)
+          : 0;
+
+        return {
+          id: item.id,
+          itemName,
+          brandName,
+          orderQty,
+          dbReceivedQty,
+          closingQty: closingQty != null ? closingQty : "—",
+          bcs
+        };
+      });
+    }
+
+    // 2. Fallback to approved_indent_items if po_items is empty/missing
     if (!itemsData || itemsData.length === 0) return [];
     return itemsData
       .filter(item => 
-        item.unique_indent_id === po.indent_id &&
-        item.party_name?.toLowerCase() === po.vendor_name?.toLowerCase() &&
+        (item.po_id === po.id || (item.unique_indent_id === po.indent_id && item.party_name?.toLowerCase() === po.vendor_name?.toLowerCase())) &&
         (parseFloat(item.order_qty) || 0) > 0
       )
       .map(item => {

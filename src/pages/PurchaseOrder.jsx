@@ -54,7 +54,14 @@ const PurchaseOrder = () => {
   const { toasts, addToast, removeToast } = useToast();
   const [removedItemIds, setRemovedItemIds] = useState(new Set());
 
-  // Reset removed items when active vendor changes
+  // Manual PO states
+  const [poMode, setPoMode] = useState("standard"); // "standard" or "manual"
+  const [manualItems, setManualItems] = useState([]);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemBox, setNewItemBox] = useState("");
+  const [newItemQty, setNewItemQty] = useState("");
+
+  // Reset states when active vendor changes
   useEffect(() => {
     setRemovedItemIds(new Set());
   }, [activeParty]);
@@ -110,10 +117,13 @@ const PurchaseOrder = () => {
   }, [approvedItems, selectedShop]);
 
   const dbParties = useMemo(() => {
+    if (poMode === "manual") {
+      return [...new Set(vendorsList.map(v => v.party_name).filter(Boolean))];
+    }
     return [...new Set(filteredApprovedItems.map(d => d.party_name).filter(Boolean))];
-  }, [filteredApprovedItems]);
+  }, [filteredApprovedItems, vendorsList, poMode]);
 
-  // If the activeParty is no longer valid for the selected shop filter, clear it
+  // If the activeParty is no longer valid for the selected shop/mode filter, clear it
   useEffect(() => {
     if (activeParty && !dbParties.includes(activeParty)) {
       setActiveParty("");
@@ -121,11 +131,19 @@ const PurchaseOrder = () => {
   }, [selectedShop, dbParties, activeParty]);
 
   const itemsForActiveParty = useMemo(() => {
+    if (poMode === "manual") {
+      return manualItems;
+    }
     const rawItems = transformActivePartyItems(filteredApprovedItems, activeParty);
     return rawItems.filter(item => !removedItemIds.has(item.id));
-  }, [filteredApprovedItems, activeParty, removedItemIds]);
+  }, [filteredApprovedItems, activeParty, removedItemIds, poMode, manualItems]);
 
   const handleRemoveItem = (itemId) => {
+    if (poMode === "manual") {
+      setManualItems(prev => prev.filter(item => item.id !== itemId));
+      addToast("Item removed from manual list.", "info");
+      return;
+    }
     const item = itemsForActiveParty.find(i => i.id === itemId);
     const itemName = item ? item.itemName : "this item";
     if (window.confirm(`Are you sure you want to remove "${itemName}" from the Purchase Order?`)) {
@@ -136,6 +154,48 @@ const PurchaseOrder = () => {
       });
       addToast(`Removed "${itemName}" from current PO view.`, "info");
     }
+  };
+
+  const handleManualAddItem = () => {
+    const trimmedName = newItemName.trim();
+    if (!trimmedName) {
+      addToast("Please enter an Item Name.", "error");
+      return;
+    }
+
+    const boxQty = parseFloat(newItemBox) || 0;
+    const bottleQty = parseInt(newItemQty, 10) || 0;
+
+    if (boxQty <= 0 && bottleQty <= 0) {
+      addToast("Please enter a valid Box Quantity or Bottle Quantity (> 0).", "error");
+      return;
+    }
+
+    if (boxQty < 0 || bottleQty < 0) {
+      addToast("Quantities cannot be negative.", "error");
+      return;
+    }
+
+    // Determine the qtyType and displayQty based on quantities
+    const qtyType = boxQty >= 0.90 ? "Box" : "Bottles";
+    const displayQty = qtyType === "Box" ? Math.round(boxQty).toString() : Math.ceil(bottleQty).toString();
+
+    const newItemObj = {
+      id: `manual-${Date.now()}-${Math.random()}`,
+      itemName: trimmedName,
+      brandName: trimmedName,
+      orderBox: boxQty,
+      orderQty: bottleQty,
+      qtyType,
+      displayQty,
+      shopName: selectedShop
+    };
+
+    setManualItems(prev => [...prev, newItemObj]);
+    setNewItemName("");
+    setNewItemBox("");
+    setNewItemQty("");
+    addToast(`Added item "${trimmedName}" to manual PO.`, "success");
   };
 
   const handleDeleteVendor = async (vendorName) => {
@@ -167,13 +227,21 @@ const PurchaseOrder = () => {
 
   // Reactively auto-select company based on selected vendor (activeParty) and their items
   useEffect(() => {
-    if (!activeParty || itemsForActiveParty.length === 0) {
+    if (!activeParty) {
       setSelectedCompanyId("none");
       return;
     }
 
-    const shopName = (itemsForActiveParty[0]?.shopName || itemsForActiveParty[0]?.shop_name || "").trim().toLowerCase();
-    if (!shopName) {
+    let shopName = "";
+    if (poMode === "manual") {
+      shopName = (selectedShop || "").trim().toLowerCase();
+    } else {
+      if (itemsForActiveParty.length > 0) {
+        shopName = (itemsForActiveParty[0]?.shopName || itemsForActiveParty[0]?.shop_name || "").trim().toLowerCase();
+      }
+    }
+
+    if (!shopName || shopName === "all") {
       setSelectedCompanyId("none");
       return;
     }
@@ -189,7 +257,7 @@ const PurchaseOrder = () => {
     } else {
       setSelectedCompanyId("none");
     }
-  }, [activeParty, itemsForActiveParty, companies]);
+  }, [activeParty, itemsForActiveParty, companies, poMode, selectedShop]);
 
   const activeCompany = useMemo(() => {
     if (selectedCompanyId === "none" || !selectedCompanyId) {
@@ -206,13 +274,25 @@ const PurchaseOrder = () => {
   const handleDownloadPDF = async () => {
     if (isSubmittingRef.current || isUploading) return;
 
+    if (poMode === "manual" && selectedShop === "All") {
+      addToast("Please select a specific shop from the sidebar filter to create a Manual PO.", "error");
+      return;
+    }
+
+    if (itemsForActiveParty.length === 0) {
+      addToast("Please select a vendor and add at least one item before generating the PO.", "error");
+      return;
+    }
+
     if (!activeVendorDetails?.contact) {
       addToast("Error: The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.", "error");
       setShippingError("The selected vendor does not have a contact number. Vendor contact number is mandatory to generate a PO.");
       return;
     }
 
-    const isKunalShop = itemsForActiveParty.some(item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL");
+    const isKunalShop = poMode === "manual" 
+      ? selectedShop.toUpperCase() === "KUNAL"
+      : itemsForActiveParty.some(item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL");
 
     if (isKunalShop) {
       if (!selectedReceiver) {
@@ -285,12 +365,14 @@ const PurchaseOrder = () => {
       const currentVendorId = await generateVendorId(activeParty);
 
       // --- Insert Database Record ---
-      const currentIndentId = itemsForActiveParty.length > 0 ? itemsForActiveParty[0].unique_indent_id : null;
+      const currentIndentId = poMode === "manual" ? null : (itemsForActiveParty.length > 0 ? itemsForActiveParty[0].unique_indent_id : null);
       const firstBrandName = itemsForActiveParty.length > 0 ? itemsForActiveParty[0].brandName : null;
       // Capture shop name at creation time so it survives indent_items deletion
-      const currentShopName = itemsForActiveParty.length > 0
-        ? (itemsForActiveParty[0].shopName || itemsForActiveParty[0].shop_name || null)
-        : null;
+      const currentShopName = poMode === "manual"
+        ? selectedShop
+        : (itemsForActiveParty.length > 0
+            ? (itemsForActiveParty[0].shopName || itemsForActiveParty[0].shop_name || null)
+            : null);
 
       let totalOrderQty = 0;
       let totalOrderBox = 0;
@@ -317,13 +399,14 @@ const PurchaseOrder = () => {
         total_order_box: totalOrderBox,
         transporter_number: selectedTransporter || null,
         receiver_number: selectedReceiver || null,
-        po_items: itemsForActiveParty
+        po_items: itemsForActiveParty,
+        po_type: poMode === "manual" ? "manual_po" : "system_po"
       });
 
       const insertedPoId = insertedData[0]?.id;
 
       // --- Mark approved items as ordered in approved_indent_items now that PO is created ---
-      if (currentIndentId && insertedPoId) {
+      if (poMode !== "manual" && currentIndentId && insertedPoId) {
         try {
           await markApprovedItemsAsOrdered(currentIndentId, activeParty, insertedPoId);
           console.log("✅ Approved items marked as ordered after PO creation:", currentIndentId);
@@ -337,7 +420,7 @@ const PurchaseOrder = () => {
       }
 
       // Update deleted/removed items in database to be is_excluded: true
-      if (removedItemIds.size > 0) {
+      if (poMode !== "manual" && removedItemIds.size > 0) {
         try {
           await excludeIndentItems(Array.from(removedItemIds), "removed_from_po");
           console.log("Successfully excluded removed items in DB");
@@ -455,6 +538,17 @@ const PurchaseOrder = () => {
 
   const handlePreviewPDF = async () => {
     if (isUploading) return;
+
+    if (poMode === "manual" && selectedShop === "All") {
+      addToast("Please select a specific shop from the sidebar filter first.", "error");
+      return;
+    }
+
+    if (itemsForActiveParty.length === 0) {
+      addToast("Please select a vendor and add at least one item before previewing the PDF.", "error");
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -524,21 +618,78 @@ const PurchaseOrder = () => {
         </div>
       </div>
 
+      {/* Mode Toggle Tabs */}
+      <div className="po-mode-tabs" style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+        <button
+          onClick={() => {
+            setPoMode("standard");
+            setActiveParty("");
+          }}
+          style={{
+            padding: '10px 20px',
+            background: poMode === "standard" ? '#e0e7ff' : 'none',
+            border: 'none',
+            borderRadius: '8px',
+            color: poMode === "standard" ? '#4338ca' : '#64748b',
+            fontWeight: '600',
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ShoppingCart size={16} /> Standard PO
+        </button>
+        <button
+          onClick={() => {
+            setPoMode("manual");
+            setActiveParty("");
+            setManualItems([]);
+          }}
+          style={{
+            padding: '10px 20px',
+            background: poMode === "manual" ? '#e0e7ff' : 'none',
+            border: 'none',
+            borderRadius: '8px',
+            color: poMode === "manual" ? '#4338ca' : '#64748b',
+            fontWeight: '600',
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <FileText size={16} /> Manual PO
+        </button>
+      </div>
+
       {isLoading && (
         <div className="po-empty">
           <h2 style={{ color: '#64748b' }}>Loading data...</h2>
         </div>
       )}
 
-      {!isLoading && dbParties.length === 0 && (
+      {!isLoading && poMode === "standard" && dbParties.length === 0 && (
         <div className="po-empty">
           <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
-          <h2>No Vendors Found</h2>
-          <p>Please add vendors in the Settings section first.</p>
+          <h2>No Pending Approved Indents</h2>
+          <p>Please approve indents first, or switch to Manual PO mode.</p>
         </div>
       )}
 
-      {!isLoading && dbParties.length > 0 && (
+      {!isLoading && poMode === "manual" && selectedShop === "All" && (
+        <div className="po-empty">
+          <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
+          <h2>Select a Shop</h2>
+          <p>Please select a specific shop from the top-left sidebar filter to create a Manual PO.</p>
+        </div>
+      )}
+
+      {!isLoading && (poMode === "manual" ? selectedShop !== "All" : dbParties.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }} ref={printRef}>
           <PurchaseOrderPreview
             id="shipping-details-pdf-trader"
@@ -558,11 +709,18 @@ const PurchaseOrder = () => {
             setSelectedReceiver={setSelectedReceiver}
             shippingError={shippingError}
             onRemoveItem={handleRemoveItem}
-            onDeleteVendor={handleDeleteVendor}
+            onDeleteVendor={poMode === "manual" ? null : handleDeleteVendor}
+            poMode={poMode}
+            newItemName={newItemName}
+            setNewItemName={setNewItemName}
+            newItemBox={newItemBox}
+            setNewItemBox={setNewItemBox}
+            newItemQty={newItemQty}
+            setNewItemQty={setNewItemQty}
+            onAddItem={handleManualAddItem}
           />
         </div>
       )}
-
     </div>
   );
 };
