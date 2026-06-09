@@ -247,3 +247,13 @@ export const markApprovedItemsAsOrdered = async (uniqueIndentId, vendorName, poI
 export const deleteIndentAfterPO = async (uniqueIndentId) => {
   console.log("deleteIndentAfterPO called (no-op). Items are managed via approved_indent_items.");
 };
+
+export const fetchItemList = async () => {
+  const { data, error } = await supabase
+    .from("item_list")
+    .select("id, item_name, bc_s, ml_s")
+    .order("item_name", { ascending: true });
+  if (error) throw error;
+  return data;
+};
+

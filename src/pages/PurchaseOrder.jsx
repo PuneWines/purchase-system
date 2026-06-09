@@ -23,7 +23,8 @@ import {
   getOrCreateReceiverPortalLink,
   excludeIndentItems,
   deleteIndentAfterPO,
-  markApprovedItemsAsOrdered
+  markApprovedItemsAsOrdered,
+  fetchItemList
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
 import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
@@ -60,11 +61,17 @@ const PurchaseOrder = () => {
   const [newItemName, setNewItemName] = useState("");
   const [newItemBox, setNewItemBox] = useState("");
   const [newItemQty, setNewItemQty] = useState("");
+  const [itemList, setItemList] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
 
-  // Reset states when active vendor changes
+  // Reset states when active vendor changes or PO mode changes
   useEffect(() => {
     setRemovedItemIds(new Set());
-  }, [activeParty]);
+    setNewItemName("");
+    setNewItemBox("");
+    setNewItemQty("");
+    setSelectedItem(null);
+  }, [activeParty, poMode]);
 
   const loadPageData = async (shouldShowLoading = true) => {
     if (shouldShowLoading) setIsLoading(true);
@@ -76,6 +83,13 @@ const PurchaseOrder = () => {
       if (data.vendorsData) setVendorsList(data.vendorsData);
       if (data.transpData) setTransporters(data.transpData);
       if (data.recvData) setReceivers(data.recvData);
+
+      try {
+        const items = await fetchItemList();
+        setItemList(items);
+      } catch (err) {
+        console.error("Error fetching item list:", err);
+      }
 
       if (data.indentData) {
         const existingPos = data.poData || [];
@@ -156,10 +170,54 @@ const PurchaseOrder = () => {
     }
   };
 
+  const handleItemSelection = (item) => {
+    setSelectedItem(item && !item.isCustom ? item : null);
+    setNewItemName(item ? item.item_name : "");
+    
+    if (item && !item.isCustom) {
+      const bcs = item["bc_s"];
+      if (bcs) {
+        if (newItemBox && !newItemQty) {
+          const boxVal = parseFloat(newItemBox) || 0;
+          setNewItemQty(Math.round(boxVal * bcs).toString());
+        } else if (newItemQty && !newItemBox) {
+          const bottleVal = parseInt(newItemQty, 10) || 0;
+          setNewItemBox(parseFloat((bottleVal / bcs).toFixed(4)).toString());
+        }
+      }
+    }
+  };
+
+  const handleBoxQtyChange = (val) => {
+    setNewItemBox(val);
+    if (selectedItem) {
+      const bcs = selectedItem["bc_s"];
+      if (bcs && val !== "") {
+        const boxVal = parseFloat(val) || 0;
+        setNewItemQty(Math.round(boxVal * bcs).toString());
+      } else if (val === "") {
+        setNewItemQty("");
+      }
+    }
+  };
+
+  const handleBottleQtyChange = (val) => {
+    setNewItemQty(val);
+    if (selectedItem) {
+      const bcs = selectedItem["bc_s"];
+      if (bcs && val !== "") {
+        const bottleVal = parseInt(val, 10) || 0;
+        setNewItemBox(parseFloat((bottleVal / bcs).toFixed(4)).toString());
+      } else if (val === "") {
+        setNewItemBox("");
+      }
+    }
+  };
+
   const handleManualAddItem = () => {
     const trimmedName = newItemName.trim();
     if (!trimmedName) {
-      addToast("Please enter an Item Name.", "error");
+      addToast("Please enter or select an Item Name.", "error");
       return;
     }
 
@@ -184,6 +242,8 @@ const PurchaseOrder = () => {
       id: `manual-${Date.now()}-${Math.random()}`,
       itemName: trimmedName,
       brandName: trimmedName,
+      bc_s: selectedItem ? selectedItem["bc_s"] : null,
+      ml_s: selectedItem ? selectedItem["ml_s"] : null,
       orderBox: boxQty,
       orderQty: bottleQty,
       qtyType,
@@ -195,6 +255,7 @@ const PurchaseOrder = () => {
     setNewItemName("");
     setNewItemBox("");
     setNewItemQty("");
+    setSelectedItem(null);
     addToast(`Added item "${trimmedName}" to manual PO.`, "success");
   };
 
@@ -711,12 +772,15 @@ const PurchaseOrder = () => {
             onRemoveItem={handleRemoveItem}
             onDeleteVendor={poMode === "manual" ? null : handleDeleteVendor}
             poMode={poMode}
+            itemList={itemList}
+            selectedItem={selectedItem}
+            onItemSelect={handleItemSelection}
             newItemName={newItemName}
             setNewItemName={setNewItemName}
             newItemBox={newItemBox}
-            setNewItemBox={setNewItemBox}
+            onBoxQtyChange={handleBoxQtyChange}
             newItemQty={newItemQty}
-            setNewItemQty={setNewItemQty}
+            onBottleQtyChange={handleBottleQtyChange}
             onAddItem={handleManualAddItem}
           />
         </div>

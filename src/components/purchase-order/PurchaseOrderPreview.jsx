@@ -6,6 +6,7 @@ import POItemsTable from "./POItemsTable";
 import POTerms from "./POTerms";
 import POSignature from "./POSignature";
 import POShippingDetails from "./POShippingDetails";
+import SearchableItemDropdown from "./SearchableItemDropdown";
 
 const PurchaseOrderPreview = ({
   id,
@@ -27,12 +28,15 @@ const PurchaseOrderPreview = ({
   onRemoveItem,
   onDeleteVendor,
   poMode,
+  itemList = [],
+  selectedItem = null,
+  onItemSelect,
   newItemName,
   setNewItemName,
   newItemBox,
-  setNewItemBox,
+  onBoxQtyChange,
   newItemQty,
-  setNewItemQty,
+  onBottleQtyChange,
   onAddItem
 }) => {
   const isKunalShop = items.some(
@@ -80,20 +84,11 @@ const PurchaseOrderPreview = ({
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: '2 1 200px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Item Name</label>
-              <input
-                type="text"
+              <SearchableItemDropdown
+                items={itemList}
                 value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="Enter item name"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                onChange={onItemSelect}
+                placeholder="Search database or enter custom item..."
               />
             </div>
             <div style={{ flex: '1 1 100px' }}>
@@ -103,7 +98,7 @@ const PurchaseOrderPreview = ({
                 min="0"
                 step="any"
                 value={newItemBox}
-                onChange={(e) => setNewItemBox(e.target.value)}
+                onChange={(e) => onBoxQtyChange(e.target.value)}
                 placeholder="0"
                 style={{
                   width: '100%',
@@ -123,7 +118,7 @@ const PurchaseOrderPreview = ({
                 min="0"
                 step="1"
                 value={newItemQty}
-                onChange={(e) => setNewItemQty(e.target.value)}
+                onChange={(e) => onBottleQtyChange(e.target.value)}
                 placeholder="0"
                 style={{
                   width: '100%',
@@ -156,6 +151,12 @@ const PurchaseOrderPreview = ({
               + Add Item
             </button>
           </div>
+          {selectedItem && selectedItem['bc_s'] && (
+            <div style={{ fontSize: '11px', color: '#6366f1', marginTop: '10px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: '#6366f1', borderRadius: '50%' }}></span>
+              Auto-calculating linked quantities using case size of {selectedItem['bc_s']} bottles ({selectedItem.ml_s || '—'} ml)
+            </div>
+          )}
         </div>
       )}
 
