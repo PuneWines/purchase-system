@@ -78,7 +78,7 @@ const PurchaseOrder = () => {
     try {
       const nextPo = await fetchNextPoNumber();
       setNextPoNumber(nextPo);
-      
+
       const data = await fetchPageData();
       if (data.vendorsData) setVendorsList(data.vendorsData);
       if (data.transpData) setTransporters(data.transpData);
@@ -96,8 +96,8 @@ const PurchaseOrder = () => {
         const filteredIndentData = data.indentData.filter(item => {
           if (!item.unique_indent_id || !item.party_name) return true;
           const hasPo = existingPos.some(
-            po => po.indent_id === item.unique_indent_id && 
-                  po.vendor_name?.trim().toLowerCase() === item.party_name?.trim().toLowerCase()
+            po => po.indent_id === item.unique_indent_id &&
+              po.vendor_name?.trim().toLowerCase() === item.party_name?.trim().toLowerCase()
           );
           return !hasPo;
         });
@@ -173,7 +173,7 @@ const PurchaseOrder = () => {
   const handleItemSelection = (item) => {
     setSelectedItem(item && !item.isCustom ? item : null);
     setNewItemName(item ? item.item_name : "");
-    
+
     if (item && !item.isCustom) {
       const bcs = item["bc_s"];
       if (bcs) {
@@ -351,7 +351,7 @@ const PurchaseOrder = () => {
       return;
     }
 
-    const isKunalShop = poMode === "manual" 
+    const isKunalShop = poMode === "manual"
       ? selectedShop.toUpperCase() === "KUNAL"
       : itemsForActiveParty.some(item => item.shopName?.toUpperCase() === "KUNAL" || item.shop_name?.toUpperCase() === "KUNAL");
 
@@ -382,11 +382,11 @@ const PurchaseOrder = () => {
 
     setIsUploading(true);
     isSubmittingRef.current = true;
-    
+
     try {
       // Use Vendor party name for PDF file names
       const baseFilename = activeParty ? `PO_${activeParty.replace(/\s+/g, '_')}` : "Purchase_Order";
-    
+
       // Create React-PDF documents
       const traderDoc = (
         <TraderPDF
@@ -413,7 +413,7 @@ const PurchaseOrder = () => {
       // Generate PDF Blobs directly in memory
       const traderBlob = await generatePdfBlob(traderDoc);
       const receiverBlob = await generatePdfBlob(receiverDoc);
-      
+
       // --- Upload to Supabase Storage ---
       const timestamp = Date.now();
       const traderStoragePath = `${baseFilename}_Trader_${timestamp}.pdf`;
@@ -432,8 +432,8 @@ const PurchaseOrder = () => {
       const currentShopName = poMode === "manual"
         ? selectedShop
         : (itemsForActiveParty.length > 0
-            ? (itemsForActiveParty[0].shopName || itemsForActiveParty[0].shop_name || null)
-            : null);
+          ? (itemsForActiveParty[0].shopName || itemsForActiveParty[0].shop_name || null)
+          : null);
 
       let totalOrderQty = 0;
       let totalOrderBox = 0;
@@ -578,13 +578,13 @@ const PurchaseOrder = () => {
       }
 
       addToast("Purchase Orders successfully generated and submitted to Supabase!", "success");
-      
+
       // Reset all model fields
       setActiveParty("");
       setSelectedTransporter("");
       setSelectedReceiver("");
       setShippingError("");
-      
+
       // Re-fetch next PO number and refresh page data
       await loadPageData();
 
@@ -660,17 +660,17 @@ const PurchaseOrder = () => {
           <p>Select a vendor to view or print their Purchase Order</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            className="po-btn-secondary" 
-            onClick={handlePreviewPDF} 
+          <button
+            className="po-btn-secondary"
+            onClick={handlePreviewPDF}
             disabled={!activeParty || isUploading}
             style={{ margin: 0 }}
           >
             <FileText size={15} /> Preview PDF
           </button>
-          <button 
-            className="po-btn-secondary" 
-            onClick={handleDownloadPDF} 
+          <button
+            className="po-btn-secondary"
+            onClick={handleDownloadPDF}
             disabled={!activeParty || isUploading}
             style={{ margin: 0 }}
           >
@@ -679,112 +679,115 @@ const PurchaseOrder = () => {
         </div>
       </div>
 
-      {/* Mode Toggle Tabs */}
-      <div className="po-mode-tabs" style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-        <button
+      {/* Mode Selector Tab Replacement */}
+      {/* Mode Toggle */}
+      <div className="flex justify-center px-5 pt-3 bg-white border border-b-0 border-slate-200 rounded-t-xl">
+        <div
+          role="switch"
+          aria-checked={poMode === "manual"}
+          tabIndex={0}
           onClick={() => {
-            setPoMode("standard");
+            const next = poMode === "standard" ? "manual" : "standard";
+            setPoMode(next);
             setActiveParty("");
+            if (next === "manual") setManualItems([]);
           }}
-          style={{
-            padding: '10px 20px',
-            background: poMode === "standard" ? '#e0e7ff' : 'none',
-            border: 'none',
-            borderRadius: '8px',
-            color: poMode === "standard" ? '#4338ca' : '#64748b',
-            fontWeight: '600',
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
+          onKeyDown={(e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+              e.preventDefault();
+              const next = poMode === "standard" ? "manual" : "standard";
+              setPoMode(next);
+              setActiveParty("");
+              if (next === "manual") setManualItems([]);
+            }
           }}
+          className="relative flex items-center bg-slate-100 border border-slate-300 rounded-full p-[3px] cursor-pointer select-none w-64"
         >
-          <ShoppingCart size={16} /> Standard PO
-        </button>
-        <button
-          onClick={() => {
-            setPoMode("manual");
-            setActiveParty("");
-            setManualItems([]);
-          }}
-          style={{
-            padding: '10px 20px',
-            background: poMode === "manual" ? '#e0e7ff' : 'none',
-            border: 'none',
-            borderRadius: '8px',
-            color: poMode === "manual" ? '#4338ca' : '#64748b',
-            fontWeight: '600',
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <FileText size={16} /> Manual PO
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="po-empty">
-          <h2 style={{ color: '#64748b' }}>Loading data...</h2>
-        </div>
-      )}
-
-      {!isLoading && poMode === "standard" && dbParties.length === 0 && (
-        <div className="po-empty">
-          <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
-          <h2>No Pending Approved Indents</h2>
-          <p>Please approve indents first, or switch to Manual PO mode.</p>
-        </div>
-      )}
-
-      {!isLoading && poMode === "manual" && selectedShop === "All" && (
-        <div className="po-empty">
-          <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
-          <h2>Select a Shop</h2>
-          <p>Please select a specific shop from the top-left sidebar filter to create a Manual PO.</p>
-        </div>
-      )}
-
-      {!isLoading && (poMode === "manual" ? selectedShop !== "All" : dbParties.length > 0) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }} ref={printRef}>
-          <PurchaseOrderPreview
-            id="shipping-details-pdf-trader"
-            partyName={activeParty}
-            items={itemsForActiveParty}
-            poNumber={nextPoNumber || "Loading..."}
-            poDate={poDate}
-            dbParties={dbParties}
-            onPartyChange={setActiveParty}
-            vendorDetails={activeVendorDetails}
-            companyInfo={activeCompany}
-            transporters={transporters}
-            receivers={receivers}
-            selectedTransporter={selectedTransporter}
-            setSelectedTransporter={setSelectedTransporter}
-            selectedReceiver={selectedReceiver}
-            setSelectedReceiver={setSelectedReceiver}
-            shippingError={shippingError}
-            onRemoveItem={handleRemoveItem}
-            onDeleteVendor={poMode === "manual" ? null : handleDeleteVendor}
-            poMode={poMode}
-            itemList={itemList}
-            selectedItem={selectedItem}
-            onItemSelect={handleItemSelection}
-            newItemName={newItemName}
-            setNewItemName={setNewItemName}
-            newItemBox={newItemBox}
-            onBoxQtyChange={handleBoxQtyChange}
-            newItemQty={newItemQty}
-            onBottleQtyChange={handleBottleQtyChange}
-            onAddItem={handleManualAddItem}
+          {/* Sliding thumb */}
+          <div
+            className={`absolute top-[3px] left-[3px] bottom-[3px] w-[calc(50%-3px)] bg-white rounded-full border border-slate-200 shadow-sm pointer-events-none transition-transform duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${poMode === "manual" ? "translate-x-[calc(100%+3px)]" : "translate-x-0"
+              }`}
           />
+
+          {/* Standard PO */}
+          <div className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[12.5px] relative z-10 pointer-events-none transition-colors duration-150 ${poMode === "standard" ? "font-medium text-slate-800" : "font-normal text-slate-400"
+            }`}>
+            <ShoppingCart size={13} />
+            Standard PO
+          </div>
+
+          {/* Manual PO */}
+          <div className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[12.5px] relative z-10 pointer-events-none transition-colors duration-150 ${poMode === "manual" ? "font-medium text-slate-800" : "font-normal text-slate-400"
+            }`}>
+            <FileText size={13} />
+            Manual PO
+          </div>
         </div>
-      )}
+      </div>
+      <div className="h-2.5 bg-white border-x border-slate-200" />
+
+      {/* ✅ Single closing panel — wraps ALL states together */}
+      <div className="border border-t-0 border-slate-200 rounded-b-xl bg-white">
+
+        {isLoading && (
+          <div className="po-empty" style={{ border: 'none', boxShadow: 'none' }}>
+            <h2 style={{ color: '#64748b' }}>Loading data...</h2>
+          </div>
+        )}
+
+        {!isLoading && poMode === "standard" && dbParties.length === 0 && (
+          <div className="po-empty" style={{ border: 'none', boxShadow: 'none' }}>
+            <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
+            <h2>No Pending Approved Indents</h2>
+            <p>Please approve indents first, or switch to Manual PO mode.</p>
+          </div>
+        )}
+
+        {!isLoading && poMode === "manual" && selectedShop === "All" && (
+          <div className="po-empty" style={{ border: 'none', boxShadow: 'none' }}>
+            <ShoppingCart size={40} style={{ marginBottom: 16, opacity: 0.5 }} />
+            <h2>Select a Shop</h2>
+            <p>Please select a specific shop from the top-left sidebar filter to create a Manual PO.</p>
+          </div>
+        )}
+
+        {!isLoading && (poMode === "manual" ? selectedShop !== "All" : dbParties.length > 0) && (
+          <div ref={printRef} style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            <PurchaseOrderPreview
+              id="shipping-details-pdf-trader"
+              partyName={activeParty}
+              items={itemsForActiveParty}
+              poNumber={nextPoNumber || "Loading..."}
+              poDate={poDate}
+              dbParties={dbParties}
+              onPartyChange={setActiveParty}
+              vendorDetails={activeVendorDetails}
+              companyInfo={activeCompany}
+              transporters={transporters}
+              receivers={receivers}
+              selectedTransporter={selectedTransporter}
+              setSelectedTransporter={setSelectedTransporter}
+              selectedReceiver={selectedReceiver}
+              setSelectedReceiver={setSelectedReceiver}
+              shippingError={shippingError}
+              onRemoveItem={handleRemoveItem}
+              onDeleteVendor={poMode === "manual" ? null : handleDeleteVendor}
+              poMode={poMode}
+              itemList={itemList}
+              selectedItem={selectedItem}
+              onItemSelect={handleItemSelection}
+              newItemName={newItemName}
+              setNewItemName={setNewItemName}
+              newItemBox={newItemBox}
+              onBoxQtyChange={handleBoxQtyChange}
+              newItemQty={newItemQty}
+              onBottleQtyChange={handleBottleQtyChange}
+              onAddItem={handleManualAddItem}
+            />
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };
