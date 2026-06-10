@@ -41,7 +41,7 @@ const TransporterPortal = () => {
 
   // Memoized filter for pending shipments
   const pendingPoList = useMemo(() => {
-    return poList.filter(po => po.transporter_status !== "yes" && po.transporter_status !== "no" && !successPoIds[po.id]);
+    return poList.filter(po => po.trader_status !== "no" && po.transporter_status !== "yes" && po.transporter_status !== "no" && !successPoIds[po.id]);
   }, [poList, successPoIds]);
 
   // Fetch Transporter details and purchase orders
@@ -72,7 +72,9 @@ const TransporterPortal = () => {
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
-      setPoList(pos || []);
+      // Filter out POs where trader_status is "no" (rejected by supplier)
+      const activePos = (pos || []).filter(po => po.trader_status !== "no");
+      setPoList(activePos);
 
       // Initialize form fields for POs
       const newPickupDates = {};

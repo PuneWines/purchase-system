@@ -37,7 +37,7 @@ const ReceiverPortal = () => {
 
   // Memoized filter for pending receiver confirmations
   const pendingPoList = useMemo(() => {
-    return poList.filter(po => po.receiver_status !== "yes" && po.receiver_status !== "no" && !successPoIds[po.id]);
+    return poList.filter(po => po.trader_status !== "no" && po.receiver_status !== "yes" && po.receiver_status !== "no" && !successPoIds[po.id]);
   }, [poList, successPoIds]);
 
   // Fetch Receiver details and purchase orders
@@ -69,7 +69,9 @@ const ReceiverPortal = () => {
         .order("created_at", { ascending: false });
 
       if (posError) throw posError;
-      setPoList(pos || []);
+      // Filter out POs where trader_status is "no" (rejected by supplier)
+      const activePos = (pos || []).filter(po => po.trader_status !== "no");
+      setPoList(activePos);
 
       // Initialize form fields for POs
       const newRemarks = {};

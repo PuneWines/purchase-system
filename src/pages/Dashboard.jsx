@@ -276,9 +276,11 @@ const Dashboard = () => {
 
   // Search Results for the PO Hub Table
   const searchedPOs = useMemo(() => {
-    if (!searchQuery) return filteredPurchaseOrders;
+    // Filter out rejected POs from the active list
+    const activePOs = filteredPurchaseOrders.filter(po => po.trader_status !== "no");
+    if (!searchQuery) return activePOs;
     const q = searchQuery.toLowerCase();
-    return filteredPurchaseOrders.filter(
+    return activePOs.filter(
       (po) =>
         po.po_number.toLowerCase().includes(q) ||
         po.vendor_name.toLowerCase().includes(q) ||

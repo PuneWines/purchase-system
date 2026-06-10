@@ -276,7 +276,10 @@ const VendorPortal = () => {
     const rem = remarks[poId]?.trim() || "";
     const decisions = itemStatuses[poId] || {};
 
-    if (!dDate) {
+    const items = poItems[poId] || [];
+    const allRejected = items.length > 0 && items.every(item => decisions[item.id] === "rejected");
+
+    if (!allRejected && !dDate) {
       setFormErrors(prev => ({ ...prev, [poId]: "Expected Dispatch Date is required." }));
       return;
     }
@@ -284,18 +287,16 @@ const VendorPortal = () => {
     setSubmittingPoId(poId);
 
     try {
-      // 1. Fetch full PO items to resolve shop name and for PDF rendering
-      const items = poItems[poId] || [];
       const isKunalShop = items.some(item => item.shopName?.toUpperCase() === "KUNAL");
 
       const updatePayload = {
-        trader_status: "yes",
+        trader_status: allRejected ? "no" : "yes",
         trader_item_statuses: decisions,
-        dispatch_date: dDate,
+        dispatch_date: allRejected ? null : dDate,
         remarks: rem
       };
 
-      if (isKunalShop) {
+      if (isKunalShop && !allRejected) {
         updatePayload.transporter_status = "yes";
         updatePayload.pickup_date = dDate;
         updatePayload.transporter_remarks = "Transporter Bypassed (KUNAL Shop)";
@@ -477,6 +478,9 @@ const VendorPortal = () => {
               const items = poItems[po.id] || [];
               const isLoadingPoItems = loadingItems[po.id];
 
+              const poItemStatuses = itemStatuses[po.id] || {};
+              const allRejected = items.length > 0 && items.every(item => poItemStatuses[item.id] === "rejected");
+
               // Totals
               const totalQty = po.total_order_qty || 0;
               const totalBox = po.total_order_box || 0;
@@ -651,10 +655,10 @@ const VendorPortal = () => {
                                 <div className="space-y-0.5">
                                   <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Expected Dispatch Date & Time</span>
                                   <strong className="text-slate-900 font-semibold">
-                                    {new Date(dispatchDates[po.id] || po.dispatch_date).toLocaleString("en-IN", { 
+                                    {dispatchDates[po.id] || po.dispatch_date ? new Date(dispatchDates[po.id] || po.dispatch_date).toLocaleString("en-IN", { 
                                       day: "2-digit", month: "short", year: "numeric",
                                       hour: "2-digit", minute: "2-digit", hour12: true
-                                    })}
+                                    }) : "—"}
                                   </strong>
                                 </div>
                                 {(remarks[po.id] || po.remarks) && (
@@ -683,15 +687,16 @@ const VendorPortal = () => {
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date & Time *
+                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date & Time {allRejected ? "" : "*"}
                                 </label>
                                 <input
                                   type="datetime-local"
-                                  required
-                                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold"
-                                  value={dispatchDates[po.id] || ""}
+                                  required={!allRejected}
+                                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                  value={allRejected ? "" : (dispatchDates[po.id] || "")}
                                   onChange={(e) => setDispatchDates(prev => ({ ...prev, [po.id]: e.target.value }))}
                                   min={formatForDateTimeLocal(new Date())}
+                                  disabled={allRejected}
                                 />
                               </div>
 
@@ -710,17 +715,19 @@ const VendorPortal = () => {
 
                               <button 
                                 type="submit" 
-                                className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                                className={`w-full py-3.5 px-6 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer ${
+                                  allRejected ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
+                                }`}
                                 disabled={submittingPoId === po.id}
                               >
                                 {submittingPoId === po.id ? (
                                   <>
                                     <Loader2 className="animate-spin" size={18} />
-                                    <span>Regenerating PO & Notifying Transporter...</span>
+                                    <span>{allRejected ? "Rejecting PO..." : "Regenerating PO & Notifying Transporter..."}</span>
                                   </>
                                 ) : (
                                   <>
-                                    <span>Confirm Dispatch & Request Pickup</span>
+                                    <span>{allRejected ? "Reject Entire PO" : "Submit PO"}</span>
                                     <ArrowRight size={18} />
                                   </>
                                 )}
@@ -864,10 +871,10 @@ const VendorPortal = () => {
               <div>
                 <span style={{ fontSize: "10px", color: "#166534", textTransform: "uppercase", fontWeight: "700" }}>Expected Dispatch Date & Time:</span>
                 <div style={{ fontSize: "14px", fontWeight: "700", color: "#14532d" }}>
-                  {new Date(pdfData.dDate).toLocaleString("en-IN", { 
+                  {pdfData.dDate ? new Date(pdfData.dDate).toLocaleString("en-IN", { 
                     day: "2-digit", month: "short", year: "numeric",
                     hour: "2-digit", minute: "2-digit", hour12: true
-                  })}
+                  }) : "—"}
                 </div>
               </div>
               {pdfData.remarks && (

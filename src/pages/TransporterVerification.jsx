@@ -121,7 +121,8 @@ const TransporterVerification = () => {
       key: "transporter_status", 
       label: "Transporter Status", 
       sortable: true,
-      render: (status) => {
+      render: (status, row) => {
+        if (row.trader_status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
         if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Picked-up</span>;
         if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
         return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
