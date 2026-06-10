@@ -208,11 +208,29 @@ export const deleteIndentAfterPO = async (uniqueIndentId) => {
 };
 
 export const fetchItemList = async () => {
-  const { data, error } = await supabase
-    .from("item_list")
-    .select("id, item_name, bc_s, ml_s")
-    .order("item_name", { ascending: true });
-  if (error) throw error;
-  return data;
+  let allData = [];
+  let page = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("item_list")
+      .select("id, item_name, bc_s, ml_s")
+      .order("item_name", { ascending: true })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (error) throw error;
+    if (data && data.length > 0) {
+      allData = [...allData, ...data];
+      page++;
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+  return allData;
 };
 

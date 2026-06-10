@@ -267,14 +267,14 @@ const VendorPortal = () => {
   };
 
   // Handle PO Submission
-  const handleSubmitPo = async (e, po) => {
-    e.preventDefault();
+  const handleSubmitPo = async (e, po, customDecisions = null, customRemarks = null) => {
+    if (e) e.preventDefault();
     const poId = po.id;
     setFormErrors(prev => ({ ...prev, [poId]: "" }));
 
     const dDate = dispatchDates[poId];
-    const rem = remarks[poId]?.trim() || "";
-    const decisions = itemStatuses[poId] || {};
+    const rem = customRemarks !== null ? customRemarks.trim() : (remarks[poId]?.trim() || "");
+    const decisions = customDecisions !== null ? customDecisions : (itemStatuses[poId] || {});
 
     const items = poItems[poId] || [];
     const allRejected = items.length > 0 && items.every(item => decisions[item.id] === "rejected");
@@ -406,6 +406,45 @@ const VendorPortal = () => {
     } finally {
       setSubmittingPoId(null);
     }
+  };
+
+  const handleApproveAllItems = (poId) => {
+    const items = poItems[poId] || [];
+    const approvedStatuses = {};
+    items.forEach(item => {
+      approvedStatuses[item.id] = "approved";
+    });
+    setItemStatuses(prev => ({
+      ...prev,
+      [poId]: approvedStatuses
+    }));
+  };
+
+  const handleRejectEntireOrder = async (po) => {
+    const poId = po.id;
+    if (!window.confirm(`Are you sure you want to reject the entire Purchase Order (${po.po_number})?`)) {
+      return;
+    }
+
+    const userRemarks = window.prompt("Optional: Enter remarks/reason for rejecting this entire order:");
+    if (userRemarks === null) return; // User cancelled
+
+    const items = poItems[poId] || [];
+    const rejectedStatuses = {};
+    items.forEach(item => {
+      rejectedStatuses[item.id] = "rejected";
+    });
+
+    setItemStatuses(prev => ({
+      ...prev,
+      [poId]: rejectedStatuses
+    }));
+    setRemarks(prev => ({
+      ...prev,
+      [poId]: userRemarks
+    }));
+
+    await handleSubmitPo(null, po, rejectedStatuses, userRemarks);
   };
 
   if (loading) {
@@ -549,14 +588,32 @@ const VendorPortal = () => {
                   {isExpanded && (
                     <div className="px-5 pb-6 pt-4 border-t border-slate-100 bg-slate-50/50 space-y-6">
                       
-                      {/* Original PO Document View Link */}
-                      <div className="flex justify-end">
+                      {/* Quick Actions & Original PO Document View Link */}
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        {!isSubmitted && !isRejected && (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveAllItems(po.id)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Check size={14} /> Approve All Items
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectEntireOrder(po)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                              <X size={14} /> Reject Entire Order
+                            </button>
+                          </div>
+                        )}
                         {po.trader_pdf_url && (
                           <a 
                             href={po.trader_pdf_url} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg transition-colors sm:ml-auto"
                           >
                             <FileText size={16} /> View Current PO Invoice
                           </a>

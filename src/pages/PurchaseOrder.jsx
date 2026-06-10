@@ -90,6 +90,8 @@ const PurchaseOrder = () => {
   const { data: itemsListVal } = useQuery({
     queryKey: ["itemList"],
     queryFn: fetchItemList,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Sync React Query data to local state for seamless backwards compatibility

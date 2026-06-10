@@ -5,6 +5,18 @@ import "../styles/Pages.css";
 import { supabase } from "../../utils/supabase";
 import { Loader2, Archive, X, Eye, Search, Trash2 } from "lucide-react";
 
+const formatDateTime = (isoString) => {
+  if (!isoString) return "—";
+  return new Date(isoString).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+};
+
 const Approval = () => {
   const [groupedApprovals, setGroupedApprovals] = useState({});
   const [selectedIndentId, setSelectedIndentId] = useState(null);
@@ -16,6 +28,9 @@ const Approval = () => {
   const [excludedSearchQuery, setExcludedSearchQuery] = useState("");
   const [originalIndentItems, setOriginalIndentItems] = useState([]);
   const [originalStatuses, setOriginalStatuses] = useState(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!selectedIndentId) {
@@ -466,17 +481,56 @@ const Approval = () => {
     fontWeight: '500'
   };
 
+  const checkDateRange = (createdAt) => {
+    if (!createdAt) return true;
+    const date = new Date(createdAt);
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      if (date < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (date > end) return false;
+    }
+    return true;
+  };
+
+  const checkSearchQuery = (groupKey, items) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    
+    // Match Indent Display Label / ID
+    const indentDisplayLabel = groupKey.includes('::') ? groupKey.split('::')[1] : groupKey;
+    if (indentDisplayLabel.toLowerCase().includes(q)) return true;
+    
+    // Match Shop Name
+    const shopName = items[0]?.shop_name || "";
+    if (shopName.toLowerCase().includes(q)) return true;
+    
+    // Match Party Name
+    const partyName = items[0]?.party_name || "";
+    if (partyName.toLowerCase().includes(q)) return true;
+    
+    return false;
+  };
+
   const pendingBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
     const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
+    const dateOk = checkDateRange(items[0]?.created_at);
+    const searchOk = checkSearchQuery(baseId, items);
     // Ignore excluded items when determining pending status
-    return shopOk && items.some(item => !item.is_excluded && (!item.approval_status || item.approval_status === 'pending'));
+    return shopOk && dateOk && searchOk && items.some(item => !item.is_excluded && (!item.approval_status || item.approval_status === 'pending'));
   });
 
   const historyBatches = Object.entries(groupedApprovals).filter(([baseId, items]) => {
     const shopOk = selectedShop === "All" || (items[0]?.shop_name === selectedShop);
+    const dateOk = checkDateRange(items[0]?.created_at);
+    const searchOk = checkSearchQuery(baseId, items);
     // Determine history based on all active (non-excluded) items
     const activeItems = items.filter(item => !item.is_excluded);
-    return shopOk && activeItems.length > 0 && activeItems.every(item => item.approval_status && item.approval_status !== 'pending');
+    return shopOk && dateOk && searchOk && activeItems.length > 0 && activeItems.every(item => item.approval_status && item.approval_status !== 'pending');
   });
 
   const displayedBatches = activeTab === "pending" ? pendingBatches : historyBatches;
@@ -528,6 +582,123 @@ const Approval = () => {
         </button>
       </div>
 
+      {/* Controls: Search & Date Filters */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '16px',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '20px',
+        padding: '16px',
+        backgroundColor: '#f8fafc',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0'
+      }}>
+        {/* Search Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1', minWidth: '260px', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', display: 'flex', alignItems: 'center' }}>
+            <Search size={18} />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by Indent ID, Shop Name or Party Name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 38px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#1e293b',
+              outline: 'none',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.2s',
+              fontWeight: '500'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#4f46e5'}
+            onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Date Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#475569' }}>From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#1e293b',
+                outline: 'none',
+                fontWeight: '500'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#475569' }}>To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#1e293b',
+                outline: 'none',
+                fontWeight: '500'
+              }}
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              onClick={() => { setStartDate(""); setEndDate(""); }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#475569',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+            >
+              Clear Dates
+            </button>
+          )}
+        </div>
+      </div>
+
       {showLoadingScreen ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px', color: '#94a3b8' }}>
           <Loader2 style={{ animation: 'spin 1s linear infinite', width: '40px', height: '40px', marginBottom: '16px' }} />
@@ -554,8 +725,7 @@ const Approval = () => {
                   <th style={thStyle}>Shop Name</th>
                   {activeTab === 'history' && <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>}
                   <th style={thStyle}>Party Name</th>
-                  <th style={thStyle}>1st Item Name</th>
-                  <th style={thStyle}>1st Brand Name</th>
+                  <th style={thStyle}>{activeTab === 'pending' ? 'Created At' : 'Approved At'}</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Total Order Qty</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Total Order Box</th>
                 </tr>
@@ -658,8 +828,7 @@ const Approval = () => {
                       </td>
                     )}
                     <td style={tdStyle}>{items[0]?.party_name || "-"}</td>
-                    <td style={tdStyle}>{items[0]?.item_name || "-"}</td>
-                    <td style={tdStyle}>{items[0]?.brand_name || "-"}</td>
+                    <td style={tdStyle}>{formatDateTime(items[0]?.created_at)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{calculateTotalOrderQty(items)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{calculateTotalOrderBox(items)}</td>
                   </tr>

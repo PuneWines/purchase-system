@@ -27,15 +27,13 @@ const SearchableItemDropdown = ({ items = [], value = "", onChange, placeholder 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [value]);
 
-  // Filter items. If search is empty, show the first 100 items. If search has text, filter and show up to 100 matches.
+  // Filter items. If search is empty, show all items. If search has text, filter and show all matches.
   const filteredItems = React.useMemo(() => {
     if (!searchTerm.trim()) {
-      return items.slice(0, 100);
+      return items;
     }
     const cleanSearch = searchTerm.toLowerCase();
-    return items
-      .filter((item) => (item.item_name || "").toLowerCase().includes(cleanSearch))
-      .slice(0, 100);
+    return items.filter((item) => (item.item_name || "").toLowerCase().includes(cleanSearch));
   }, [items, searchTerm]);
 
   const handleSelect = (item) => {
