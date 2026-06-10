@@ -166,11 +166,20 @@ const PurchaseOrder = () => {
   }, [selectedShop, dbParties, activeParty]);
 
   const itemsForActiveParty = useMemo(() => {
+    let list = [];
     if (poMode === "manual") {
-      return manualItems;
+      list = [...manualItems];
+    } else {
+      const rawItems = transformActivePartyItems(filteredApprovedItems, activeParty);
+      list = rawItems.filter(item => !removedItemIds.has(item.id));
     }
-    const rawItems = transformActivePartyItems(filteredApprovedItems, activeParty);
-    return rawItems.filter(item => !removedItemIds.has(item.id));
+
+    // Sort items by ML quantity (ascending) only
+    return list.sort((a, b) => {
+      const mlA = parseFloat(a.mls !== undefined ? a.mls : a.ml_s) || 0;
+      const mlB = parseFloat(b.mls !== undefined ? b.mls : b.ml_s) || 0;
+      return mlA - mlB;
+    });
   }, [filteredApprovedItems, activeParty, removedItemIds, poMode, manualItems]);
 
   const handleRemoveItem = (itemId) => {
