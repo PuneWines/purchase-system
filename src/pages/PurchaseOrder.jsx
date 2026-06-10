@@ -174,8 +174,13 @@ const PurchaseOrder = () => {
       list = rawItems.filter(item => !removedItemIds.has(item.id));
     }
 
-    // Sort items by ML quantity (ascending) only
+    // Sort items by name (ascending) first, then by ML quantity (ascending)
     return list.sort((a, b) => {
+      const nameA = (a.itemName || "").trim();
+      const nameB = (b.itemName || "").trim();
+      const nameComp = nameA.localeCompare(nameB);
+      if (nameComp !== 0) return nameComp;
+
       const mlA = parseFloat(a.mls !== undefined ? a.mls : a.ml_s) || 0;
       const mlB = parseFloat(b.mls !== undefined ? b.mls : b.ml_s) || 0;
       return mlA - mlB;

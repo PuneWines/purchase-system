@@ -25,7 +25,7 @@ const TERMS = [
   "Delivery should be strictly done within 5 days from the date of purchase order.",
 ];
 
-const formatForDateTimeLocal = (dateStr) => {
+const formatForDateOnly = (dateStr) => {
   if (!dateStr) return "";
   try {
     const d = new Date(dateStr);
@@ -34,12 +34,26 @@ const formatForDateTimeLocal = (dateStr) => {
     const year = d.getFullYear();
     const month = pad(d.getMonth() + 1);
     const day = pad(d.getDate());
-    const hours = pad(d.getHours());
-    const minutes = pad(d.getMinutes());
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    return `${year}-${month}-${day}`;
   } catch (e) {
     return "";
   }
+};
+
+const combineDateWithCurrentTime = (dateStr) => {
+  if (!dateStr) return null;
+  const now = new Date();
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const combined = new Date(
+    year,
+    month - 1,
+    day,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds()
+  );
+  return combined.toISOString();
 };
 
 const VendorPortal = () => {
@@ -124,7 +138,7 @@ const VendorPortal = () => {
       pos?.forEach(po => {
         if (po.trader_status === "yes") {
           newTpNumbers[po.id] = po.tp_number || "";
-          newDispatchDates[po.id] = formatForDateTimeLocal(po.dispatch_date);
+          newDispatchDates[po.id] = formatForDateOnly(po.dispatch_date);
           newRemarks[po.id] = po.remarks || "";
           newItemStatuses[po.id] = po.trader_item_statuses || {};
         }
@@ -284,6 +298,8 @@ const VendorPortal = () => {
       return;
     }
 
+    const finalDispatchDate = allRejected ? null : combineDateWithCurrentTime(dDate);
+
     setSubmittingPoId(poId);
 
     try {
@@ -292,13 +308,13 @@ const VendorPortal = () => {
       const updatePayload = {
         trader_status: allRejected ? "no" : "yes",
         trader_item_statuses: decisions,
-        dispatch_date: allRejected ? null : dDate,
+        dispatch_date: finalDispatchDate,
         remarks: rem
       };
 
       if (isKunalShop && !allRejected) {
         updatePayload.transporter_status = "yes";
-        updatePayload.pickup_date = dDate;
+        updatePayload.pickup_date = finalDispatchDate;
         updatePayload.transporter_remarks = "Transporter Bypassed (KUNAL Shop)";
       }
 
@@ -333,7 +349,7 @@ const VendorPortal = () => {
           po,
           items,
           tpNum: po.tp_number || "",
-          dDate,
+          dDate: finalDispatchDate,
           remarks: rem,
           decisions,
           vendorDetails: vDetails,
@@ -744,15 +760,15 @@ const VendorPortal = () => {
 
                               <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date & Time {allRejected ? "" : "*"}
+                                  <Calendar size={15} className="text-slate-400" /> Expected Dispatch Date {allRejected ? "" : "*"}
                                 </label>
                                 <input
-                                  type="datetime-local"
+                                  type="date"
                                   required={!allRejected}
                                   className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-semibold disabled:bg-slate-100 disabled:cursor-not-allowed"
                                   value={allRejected ? "" : (dispatchDates[po.id] || "")}
                                   onChange={(e) => setDispatchDates(prev => ({ ...prev, [po.id]: e.target.value }))}
-                                  min={formatForDateTimeLocal(new Date())}
+                                  min={formatForDateOnly(new Date())}
                                   disabled={allRejected}
                                 />
                               </div>
