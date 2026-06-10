@@ -8,6 +8,7 @@ import "../styles/Pages.css";
 const TransporterVerification = () => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("pending");
   const { selectedShop } = useShopStore();
 
   useEffect(() => {
@@ -139,19 +140,66 @@ const TransporterVerification = () => {
     return nonKunalData.filter(item => item.shop_name === selectedShop);
   }, [data, selectedShop]);
 
+  const pendingData = useMemo(() => {
+    return filteredData.filter(item => item.transporter_status !== "yes" && item.transporter_status !== "no" && item.trader_status !== "no");
+  }, [filteredData]);
+
+  const historyData = useMemo(() => {
+    return filteredData.filter(item => item.transporter_status === "yes" || item.transporter_status === "no" || item.trader_status === "no");
+  }, [filteredData]);
+
+  const currentTabData = activeTab === "pending" ? pendingData : historyData;
+
   return (
     <div className="page-container">
       <h1>Transporter Verification</h1>
       <p className="page-description">
         View and manage transporter pick-up confirmations and delivery estimates.
       </p>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0' }}>
+        <button
+          onClick={() => setActiveTab('pending')}
+          style={{
+            padding: '12px 24px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'pending' ? '2px solid #4f46e5' : '2px solid transparent',
+            color: activeTab === 'pending' ? '#4f46e5' : '#64748b',
+            fontWeight: '600',
+            fontSize: '15px',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          Pending ({pendingData.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          style={{
+            padding: '12px 24px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'history' ? '2px solid #4f46e5' : '2px solid transparent',
+            color: activeTab === 'history' ? '#4f46e5' : '#64748b',
+            fontWeight: '600',
+            fontSize: '15px',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          History ({historyData.length})
+        </button>
+      </div>
+
       {isLoading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading records...</div>
       ) : (
         <Table
-          data={filteredData}
+          data={currentTabData}
           columns={columns}
-          title="Transporter Log"
+          title={activeTab === 'pending' ? "Pending Transporter Confirmations" : "Transporter Log History"}
           searchableColumns={["po_number", "vendor_name", "transporter_number", "shop_name"]}
           showHeader={false}
         />
