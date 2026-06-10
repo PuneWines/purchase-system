@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 import { supabase } from "../../utils/supabase";
@@ -8,7 +9,7 @@ const Approval = () => {
   const [groupedApprovals, setGroupedApprovals] = useState({});
   const [selectedIndentId, setSelectedIndentId] = useState(null);
   const [indentStatuses, setIndentStatuses] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // start as false to avoid layout flicker on cache hit
   const [activeTab, setActiveTab] = useState("pending");
   const { selectedShop } = useShopStore();
   const [showExcludedModal, setShowExcludedModal] = useState(false);
@@ -214,117 +215,97 @@ const Approval = () => {
     color: '#4338ca',
     textAlign: 'right'
   };
+  const queryClient = useQueryClient();
 
-  const fetchApprovals = async () => {
-    setIsLoading(true);
-    try {
-      // Fetch all indent items paginated
-      let allIndentItems = [];
-      let page = 0;
+  const { data: approvalsDataResponse, isLoading: isApprovalsQueryLoading } = useQuery({
+    queryKey: ["approvalsData", selectedShop],
+    queryFn: async () => {
       const pageSize = 1000;
-      let hasMore = true;
+      const totalPages = 10; // covers up to 10,000 pending items in parallel
 
-      while (hasMore) {
-        const { data: pageData, error: pageError } = await supabase
-          .from("indent_items")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (pageError) throw pageError;
-        if (pageData && pageData.length > 0) {
-          allIndentItems = [...allIndentItems, ...pageData];
-          page++;
-          if (pageData.length < pageSize) {
-            hasMore = false;
-          }
+      // 1. Fetch pending indent items in parallel pages
+      const indentPageQueries = Array.from({ length: totalPages }, (_, page) => {
+        if (selectedShop !== "All") {
+          return supabase
+            .from("indent_items")
+            .select("*, indents!inner(shop_name)")
+            .eq("indents.shop_name", selectedShop)
+            .order("created_at", { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
         } else {
-          hasMore = false;
+          return supabase
+            .from("indent_items")
+            .select("*, indents(shop_name)")
+            .order("created_at", { ascending: false })
+            .range(page * pageSize, (page + 1) * pageSize - 1);
         }
-      }
+      });
 
-      // Fetch all approved indent items paginated from approved_indent_items
-      let allApprovedIndentItems = [];
-      let approvedPage = 0;
-      let approvedHasMore = true;
-
-      while (approvedHasMore) {
-        const { data: pageData, error: pageError } = await supabase
+      // 2. Fetch approved indent items (history)
+      let approvedQuery;
+      if (selectedShop !== "All") {
+        approvedQuery = supabase
           .from("approved_indent_items")
-          .select("*")
+          .select("*, indents!inner(shop_name)")
+          .eq("indents.shop_name", selectedShop)
           .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
-
-        if (pageError) throw pageError;
-        if (pageData && pageData.length > 0) {
-          allApprovedIndentItems = [...allApprovedIndentItems, ...pageData];
-          approvedPage++;
-          if (pageData.length < pageSize) {
-            approvedHasMore = false;
-          }
-        } else {
-          approvedHasMore = false;
-        }
+          .limit(300);
+      } else {
+        approvedQuery = supabase
+          .from("approved_indent_items")
+          .select("*, indents(shop_name)")
+          .order("created_at", { ascending: false })
+          .limit(300);
       }
 
-      // Map approved items to have approval_status = 'approved' and is_excluded = false for UI compatibility
-      const mappedApproved = allApprovedIndentItems.map(item => ({
+      const [approvedResult, ...indentResults] = await Promise.all([
+        approvedQuery,
+        ...indentPageQueries
+      ]);
+
+      if (approvedResult.error) throw approvedResult.error;
+
+      let rawIndentItems = [];
+      indentResults.forEach(({ data, error }) => {
+        if (error) throw error;
+        if (data) {
+          rawIndentItems = [...rawIndentItems, ...data];
+        }
+      });
+
+      return {
+        rawIndentItems,
+        rawApprovedIndentItems: approvedResult.data || []
+      };
+    }
+  });
+
+  // Sync React Query data to local state for seamless backwards compatibility
+  useEffect(() => {
+    if (approvalsDataResponse) {
+      const enrichedIndentItems = (approvalsDataResponse.rawIndentItems || []).map(item => ({
+        ...item,
+        shop_name: item.indents?.shop_name || "Unknown"
+      }));
+
+      const enrichedApprovedItems = (approvalsDataResponse.rawApprovedIndentItems || []).map(item => ({
         ...item,
         approval_status: "approved",
-        is_excluded: false
+        is_excluded: false,
+        shop_name: item.indents?.shop_name || "Unknown"
       }));
 
       // Combine both lists
-      const combinedItems = [...allIndentItems, ...mappedApproved];
-
-      // Fetch all indents paginated to resolve shop_name
-      let allIndents = [];
-      let indentPage = 0;
-      let indentsHasMore = true;
-
-      while (indentsHasMore) {
-        const { data: pageData, error: pageError } = await supabase
-          .from("indents")
-          .select("id, shop_name")
-          .order("id", { ascending: false })
-          .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
-
-        if (pageError) throw pageError;
-        if (pageData && pageData.length > 0) {
-          allIndents = [...allIndents, ...pageData];
-          indentPage++;
-          if (pageData.length < pageSize) {
-            indentsHasMore = false;
-          }
-        } else {
-          indentsHasMore = false;
-        }
-      }
-
-      const shopMap = (allIndents || []).reduce((acc, ind) => {
-        acc[ind.id] = ind.shop_name;
-        return acc;
-      }, {});
-
-      const enriched = (combinedItems || []).map(item => ({
-        ...item,
-        shop_name: shopMap[item.indent_id] || "Unknown"
-      }));
+      const combinedItems = [...enrichedIndentItems, ...enrichedApprovedItems];
 
       // Group by base party_indent_id scoped to the parent indent UUID.
-      // Scoping to indent_id prevents items from different submissions that happen
-      // to share the same IN-N prefix from collapsing into the same modal bucket.
-      // Key format: "<indent_uuid>::<IN-N>"
-      const grouped = enriched.reduce((acc, item) => {
+      const grouped = combinedItems.reduce((acc, item) => {
         const fullId = item.party_indent_id || "Unknown";
         const parts = fullId.split('-');
         let basePartyId = fullId;
         if (parts.length >= 2 && fullId !== "Unknown") {
           basePartyId = `${parts[0]}-${parts[1]}`;
         }
-        // Scope by parent indent UUID to prevent cross-submission collisions
         const groupKey = `${item.indent_id ?? 'no-indent'}::${basePartyId}`;
         if (!acc[groupKey]) acc[groupKey] = [];
         acc[groupKey].push(item);
@@ -335,18 +316,22 @@ const Approval = () => {
       
       // Pre-fill existing statuses if they exist in DB
       const initialStatuses = {};
-      enriched.forEach(item => {
+      combinedItems.forEach(item => {
         if (item.approval_status && item.approval_status !== 'pending') {
           initialStatuses[item.id] = item.approval_status;
         }
       });
       setIndentStatuses(prev => ({ ...prev, ...initialStatuses }));
-
-    } catch (error) {
-      console.error("Error fetching approvals:", error);
-    } finally {
-      setIsLoading(false);
     }
+  }, [approvalsDataResponse]);
+
+  const showLoadingScreen = isLoading || isApprovalsQueryLoading;
+
+  // Keep fetchApprovals as a wrapper that triggers React Query cache invalidation
+  const fetchApprovals = async () => {
+    setIsLoading(true);
+    await queryClient.invalidateQueries({ queryKey: ["approvalsData"] });
+    setIsLoading(false);
   };
 
   const handleSubmitApprovals = async () => {
@@ -450,9 +435,7 @@ const Approval = () => {
     }
   };
 
-  useEffect(() => {
-    fetchApprovals();
-  }, []);
+  // React Query handles loading on mount automatically, fetchApprovals is only needed for manual action refreshes
 
   const calculateTotalOrderBox = (items) => {
     return items.reduce((sum, item) => sum + (parseFloat(item.order_box) || 0), 0).toFixed(2);
@@ -545,7 +528,7 @@ const Approval = () => {
         </button>
       </div>
 
-      {isLoading ? (
+      {showLoadingScreen ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px', color: '#94a3b8' }}>
           <Loader2 style={{ animation: 'spin 1s linear infinite', width: '40px', height: '40px', marginBottom: '16px' }} />
           <p>Loading batched data from Supabase...</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import useShopStore from "../store/useShopStore";
 import { supabase } from "../../utils/supabase";
 import {
@@ -45,29 +46,43 @@ const Dashboard = () => {
   const [selectedDashboardIndent, setSelectedDashboardIndent] = useState(null);
 
   // Fetch all dashboard data from Supabase
-  const fetchDashboardData = async () => {
-    setIsRefreshing(true);
-    try {
-      // 1. Fetch indents
-      const { data: indentsData, error: indentsError } = await supabase
-        .from("indents")
-        .select("*")
-        .order("created_at", { ascending: false });
+  const queryClient = useQueryClient();
+
+  const { data: dashboardDataResponse, isLoading: isDashboardQueryLoading, isRefetching: isDashboardQueryRefetching } = useQuery({
+    queryKey: ["dashboardData"],
+    queryFn: async () => {
+      const [
+        { data: indentsData, error: indentsError },
+        { data: itemsData, error: itemsError },
+        { data: approvedItemsData, error: approvedItemsError },
+        { data: posData, error: posError }
+      ] = await Promise.all([
+        supabase
+          .from("indents")
+          .select("id, shop_name, created_at, status, indent_number")
+          .order("created_at", { ascending: false })
+          .limit(1000),
+        supabase
+          .from("indent_items")
+          .select("id, indent_id, created_at, approval_status, is_excluded, order_box, order_qty, item_name, brand_name, liquor_type, qty_out, closing_qty, fix_per_day_avg_sale, party_indent_id")
+          .order("created_at", { ascending: false })
+          .limit(2000),
+        supabase
+          .from("approved_indent_items")
+          .select("id, indent_id, created_at, po_status, order_box, order_qty, item_name, brand_name, liquor_type, qty_out, closing_qty, threshold_sale")
+          .order("created_at", { ascending: false })
+          .limit(2000),
+        supabase
+          .from("purchase_orders")
+          .select("id, indent_id, created_at, po_number, vendor_name, total_order_qty, total_order_box, trader_status, transporter_status, receiver_status")
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      ]);
+
       if (indentsError) throw indentsError;
-
-      // 2. Fetch indent items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from("indent_items")
-        .select("*")
-        .order("created_at", { ascending: false });
       if (itemsError) throw itemsError;
-
-      // Fetch approved indent items
-      const { data: approvedItemsData, error: approvedItemsError } = await supabase
-        .from("approved_indent_items")
-        .select("*")
-        .order("created_at", { ascending: false });
       if (approvedItemsError) throw approvedItemsError;
+      if (posError) throw posError;
 
       // Map approved items to look like indent_items with 'approved' status and non-excluded
       const mappedApprovedItems = (approvedItemsData || []).map(item => ({
@@ -82,27 +97,35 @@ const Dashboard = () => {
         ...mappedApprovedItems
       ];
 
-      // 3. Fetch purchase orders
-      const { data: posData, error: posError } = await supabase
-        .from("purchase_orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (posError) throw posError;
-
-      setRawIndents(indentsData || []);
-      setRawIndentItems(combinedIndentItems || []);
-      setRawPurchaseOrders(posData || []);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      return {
+        indentsData: indentsData || [],
+        combinedIndentItems,
+        posData: posData || []
+      };
     }
-  };
+  });
+
+  // Sync React Query data to local state for seamless backwards compatibility
+  useEffect(() => {
+    if (dashboardDataResponse) {
+      setRawIndents(dashboardDataResponse.indentsData);
+      setRawIndentItems(dashboardDataResponse.combinedIndentItems);
+      setRawPurchaseOrders(dashboardDataResponse.posData);
+    }
+  }, [dashboardDataResponse]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    setIsLoading(isDashboardQueryLoading);
+  }, [isDashboardQueryLoading]);
+
+  useEffect(() => {
+    setIsRefreshing(isDashboardQueryRefetching);
+  }, [isDashboardQueryRefetching]);
+
+  // Keep fetchDashboardData as a wrapper that triggers React Query cache invalidation
+  const fetchDashboardData = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+  };
 
   // Helper: map a Purchase Order to its corresponding Shop Name via its approved indent_items
   const getShopForPO = useMemo(() => {

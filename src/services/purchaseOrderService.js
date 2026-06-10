@@ -22,114 +22,73 @@ export const fetchNextPoNumber = async () => {
 };
 
 export const fetchPageData = async () => {
-  const pageSize = 1000;
-
-  // Fetch approved indent items paginated from approved_indent_items
-  let indentData = [];
-  let indentPage = 0;
-  let indentHasMore = true;
-
-  while (indentHasMore) {
-    const { data: pageData, error: indentError } = await supabase
+  // Execute database queries in parallel to eliminate request waterfalls
+  const [
+    { data: rawIndentItems, error: indentError },
+    { data: rawPoData, error: poError },
+    { data: vendorsData, error: vendorsError },
+    { data: transpData, error: transpError },
+    { data: recvData, error: recvError }
+  ] = await Promise.all([
+    // Query 1: Fetch pending approved items and join the indents table to resolve shop_name on the database server
+    supabase
       .from("approved_indent_items")
-      .select("*")
+      .select("*, indents(shop_name)")
       .eq("po_status", "pending")
-      .order("id", { ascending: false })
-      .range(indentPage * pageSize, (indentPage + 1) * pageSize - 1);
+      .order("id", { ascending: false }),
 
-    if (indentError) throw indentError;
-    if (pageData && pageData.length > 0) {
-      // Map for backward compatibility with frontend code expecting approval_status & is_excluded
-      const mappedData = pageData.map(item => ({
-        ...item,
-        approval_status: "approved",
-        is_excluded: false
-      }));
-      indentData = [...indentData, ...mappedData];
-      indentPage++;
-      if (pageData.length < pageSize) {
-        indentHasMore = false;
-      }
-    } else {
-      indentHasMore = false;
-    }
-  }
-
-  // Fetch existing purchase orders paginated
-  let poData = [];
-  let poPage = 0;
-  let poHasMore = true;
-
-  while (poHasMore) {
-    const { data: pageData, error: poError } = await supabase
+    // Query 2: Fetch recent purchase orders to check for existing POs (avoiding full table scan)
+    supabase
       .from("purchase_orders")
       .select("indent_id, vendor_name")
-      .order("id", { ascending: false })
-      .range(poPage * pageSize, (poPage + 1) * pageSize - 1);
+      .order("created_at", { ascending: false })
+      .limit(500),
 
-    if (poError) throw poError;
-    if (pageData && pageData.length > 0) {
-      poData = [...poData, ...pageData];
-      poPage++;
-      if (pageData.length < pageSize) {
-        poHasMore = false;
-      }
-    } else {
-      poHasMore = false;
-    }
-  }
+    // Query 3: Fetch all vendors
+    supabase
+      .from("vendors")
+      .select("*"),
 
-  // Fetch indents to resolve shop_name paginated
-  let indentsData = [];
-  let indentsPage = 0;
-  let indentsHasMore = true;
+    // Query 4: Fetch all transporters
+    supabase
+      .from("transporters")
+      .select("*")
+      .order("created_at", { ascending: false }),
 
-  while (indentsHasMore) {
-    const { data: pageData, error: indentsError } = await supabase
-      .from("indents")
-      .select("id, shop_name")
-      .order("id", { ascending: false })
-      .range(indentsPage * pageSize, (indentsPage + 1) * pageSize - 1);
+    // Query 5: Fetch all receivers
+    supabase
+      .from("receivers")
+      .select("*")
+      .order("created_at", { ascending: false })
+  ]);
 
-    if (indentsError) throw indentsError;
-    if (pageData && pageData.length > 0) {
-      indentsData = [...indentsData, ...pageData];
-      indentsPage++;
-      if (pageData.length < pageSize) {
-        indentsHasMore = false;
-      }
-    } else {
-      indentsHasMore = false;
-    }
-  }
-
-  // Fetch vendors
-  const { data: vendorsData, error: vendorsError } = await supabase
-    .from("vendors")
-    .select("*");
+  if (indentError) throw indentError;
+  if (poError) throw poError;
   if (vendorsError) throw vendorsError;
-
-  // Fetch transporters
-  const { data: transpData, error: transpError } = await supabase
-    .from("transporters")
-    .select("*")
-    .order("created_at", { ascending: false });
   if (transpError) throw transpError;
-
-  // Fetch receivers
-  const { data: recvData, error: recvError } = await supabase
-    .from("receivers")
-    .select("*")
-    .order("created_at", { ascending: false });
   if (recvError) throw recvError;
 
+  // Map for backward compatibility with frontend code expecting indentsData and resolved shop_name
+  const enrichedIndentData = (rawIndentItems || []).map(item => ({
+    ...item,
+    approval_status: "approved",
+    is_excluded: false,
+    shop_name: item.indents?.shop_name || "Unknown"
+  }));
+
+  // Create a minimal indents list compatible with any other parts expecting it
+  const indentsData = (rawIndentItems || []).map(item => ({
+    id: item.indent_id,
+    shop_name: item.indents?.shop_name || "Unknown"
+  }));
+
   return {
-    indentData,
-    poData,
+    indentData: enrichedIndentData,
+    poData: rawPoData || [],
     indentsData,
-    vendorsData,
-    transpData,
-    recvData
+    vendorsData: vendorsData || [],
+    transpData: transpData || [],
+    recvData: recvData || []
   };
 };
 

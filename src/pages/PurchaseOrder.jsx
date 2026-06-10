@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Printer, ShoppingCart, FileText, Trash2 } from "lucide-react";
 import useCompanyStore from "../store/useCompanyStore";
 import useShopStore from "../store/useShopStore";
@@ -73,56 +74,74 @@ const PurchaseOrder = () => {
     setSelectedItem(null);
   }, [activeParty, poMode]);
 
+  const queryClient = useQueryClient();
+
+  const { data: pageDataResponse, isLoading: isPageDataLoading } = useQuery({
+    queryKey: ["purchaseOrderPageData"],
+    queryFn: fetchPageData,
+  });
+
+  const { data: nextPoVal } = useQuery({
+    queryKey: ["nextPoNumber"],
+    queryFn: fetchNextPoNumber,
+    staleTime: 0,
+  });
+
+  const { data: itemsListVal } = useQuery({
+    queryKey: ["itemList"],
+    queryFn: fetchItemList,
+  });
+
+  // Sync React Query data to local state for seamless backwards compatibility
+  useEffect(() => {
+    if (pageDataResponse) {
+      if (pageDataResponse.vendorsData) setVendorsList(pageDataResponse.vendorsData);
+      if (pageDataResponse.transpData) setTransporters(pageDataResponse.transpData);
+      if (pageDataResponse.recvData) setReceivers(pageDataResponse.recvData);
+
+      const existingPos = pageDataResponse.poData || [];
+      const filteredIndentData = (pageDataResponse.indentData || []).filter(item => {
+        if (!item.unique_indent_id || !item.party_name) return true;
+        const hasPo = existingPos.some(
+          po => po.indent_id === item.unique_indent_id &&
+            po.vendor_name?.trim().toLowerCase() === item.party_name?.trim().toLowerCase()
+        );
+        return !hasPo;
+      });
+
+      setApprovedItems(filteredIndentData);
+    }
+  }, [pageDataResponse]);
+
+  useEffect(() => {
+    if (nextPoVal) {
+      setNextPoNumber(nextPoVal);
+    }
+  }, [nextPoVal]);
+
+  useEffect(() => {
+    if (itemsListVal) {
+      setItemList(itemsListVal);
+    }
+  }, [itemsListVal]);
+
+  useEffect(() => {
+    setIsLoading(isPageDataLoading);
+  }, [isPageDataLoading]);
+
+  // Keep loadPageData as a compatibility wrapper that invalidates the query client cache
   const loadPageData = async (shouldShowLoading = true) => {
     if (shouldShowLoading) setIsLoading(true);
-    try {
-      const nextPo = await fetchNextPoNumber();
-      setNextPoNumber(nextPo);
-
-      const data = await fetchPageData();
-      if (data.vendorsData) setVendorsList(data.vendorsData);
-      if (data.transpData) setTransporters(data.transpData);
-      if (data.recvData) setReceivers(data.recvData);
-
-      try {
-        const items = await fetchItemList();
-        setItemList(items);
-      } catch (err) {
-        console.error("Error fetching item list:", err);
-      }
-
-      if (data.indentData) {
-        const existingPos = data.poData || [];
-        const filteredIndentData = data.indentData.filter(item => {
-          if (!item.unique_indent_id || !item.party_name) return true;
-          const hasPo = existingPos.some(
-            po => po.indent_id === item.unique_indent_id &&
-              po.vendor_name?.trim().toLowerCase() === item.party_name?.trim().toLowerCase()
-          );
-          return !hasPo;
-        });
-
-        const shopMap = (data.indentsData || []).reduce((acc, ind) => {
-          acc[ind.id] = ind.shop_name;
-          return acc;
-        }, {});
-
-        const enriched = filteredIndentData.map(item => ({
-          ...item,
-          shop_name: shopMap[item.indent_id] || "Unknown"
-        }));
-        setApprovedItems(enriched);
-      }
-    } catch (error) {
-      console.error("Error fetching page data:", error);
-    } finally {
-      if (shouldShowLoading) setIsLoading(false);
-    }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["purchaseOrderPageData"] }),
+      queryClient.invalidateQueries({ queryKey: ["nextPoNumber"] }),
+      queryClient.invalidateQueries({ queryKey: ["itemList"] })
+    ]);
+    if (shouldShowLoading) setIsLoading(false);
   };
 
   useEffect(() => {
     fetchCompanySettings();
-    loadPageData();
   }, []);
 
   const filteredApprovedItems = useMemo(() => {
