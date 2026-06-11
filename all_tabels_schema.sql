@@ -1,15 +1,16 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
-CREATE TABLE public.company_settings (
+CREATE TABLE public.indents (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  address text NOT NULL,
-  gstin text NOT NULL,
-  contact text NOT NULL,
-  email text NOT NULL,
-  terms ARRAY NOT NULL DEFAULT '{}'::text[],
-  CONSTRAINT company_settings_pkey PRIMARY KEY (id)
+  shop_name text NOT NULL,
+  status text DEFAULT 'Pending'::text CHECK (status = ANY (ARRAY['Pending'::text, 'Approved'::text, 'Rejected'::text])),
+  created_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  indent_number text,
+  CONSTRAINT indents_pkey PRIMARY KEY (id),
+  CONSTRAINT indents_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
 );
 CREATE TABLE public.indent_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -39,25 +40,38 @@ CREATE TABLE public.indent_items (
   CONSTRAINT indent_items_pkey PRIMARY KEY (id),
   CONSTRAINT indent_items_indent_id_fkey FOREIGN KEY (indent_id) REFERENCES public.indents(id)
 );
-CREATE TABLE public.indents (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  shop_name text NOT NULL,
-  status text DEFAULT 'Pending'::text CHECK (status = ANY (ARRAY['Pending'::text, 'Approved'::text, 'Rejected'::text])),
-  created_by uuid,
+CREATE TABLE public.users (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  username text NOT NULL UNIQUE,
+  email text NOT NULL UNIQUE,
+  password text NOT NULL,
+  role text NOT NULL DEFAULT 'user'::text,
+  permissions jsonb DEFAULT '[]'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  indent_number text,
-  CONSTRAINT indents_pkey PRIMARY KEY (id),
-  CONSTRAINT indents_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id)
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.masterItem (
+CREATE TABLE public.vendors (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  party_name text NOT NULL,
+  address text,
+  gstin text,
+  contact_name text,
+  contact text,
+  email text,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  portal_link text,
+  terms ARRAY DEFAULT '{}'::text[],
+  CONSTRAINT vendors_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.company_settings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  shop_id text NOT NULL CHECK (shop_id = ANY (ARRAY['friends'::text, 'vishal'::text, 'kunal'::text, 'madhura'::text, 'balaji'::text])),
-  item_name text NOT NULL,
-  avg_sale numeric NOT NULL DEFAULT 0,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT masterItem_pkey PRIMARY KEY (id)
+  name text NOT NULL,
+  address text NOT NULL,
+  gstin text NOT NULL,
+  contact text NOT NULL,
+  email text NOT NULL,
+  terms ARRAY NOT NULL DEFAULT '{}'::text[],
+  CONSTRAINT company_settings_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.purchase_orders (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -83,7 +97,22 @@ CREATE TABLE public.purchase_orders (
   receiver_status text,
   receiver_remarks text,
   received_items jsonb,
+  tp_number text,
+  trader_item_statuses jsonb DEFAULT '{}'::jsonb,
+  delivered_items jsonb DEFAULT '{}'::jsonb,
+  transporter_pdf_url text,
+  shop_name text,
+  po_items jsonb,
+  po_type text NOT NULL DEFAULT 'system_po'::text,
   CONSTRAINT purchase_orders_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.transporters (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  contact_number text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  portal_link text,
+  CONSTRAINT transporters_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.receivers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -92,31 +121,39 @@ CREATE TABLE public.receivers (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   CONSTRAINT receivers_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.transporters (
+CREATE TABLE public.approved_indent_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  contact_number text NOT NULL,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT transporters_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.users (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  username text NOT NULL UNIQUE,
-  email text NOT NULL UNIQUE,
-  password text NOT NULL,
-  role text NOT NULL DEFAULT 'user'::text,
-  permissions jsonb DEFAULT '[]'::jsonb,
+  original_item_id uuid,
+  indent_id uuid NOT NULL,
+  party_indent_id text,
+  item_name text NOT NULL,
+  brand_name text,
+  bcs numeric,
+  mls text,
+  liquor_type text,
+  party_name text,
+  qty_out numeric,
+  closing_qty numeric,
+  last_month_sale_box numeric,
+  per_day_sale_last_month numeric,
+  threshold_sale numeric,
+  closing_qty_box numeric,
+  order_box numeric,
+  order_qty numeric,
+  unique_indent_id text,
+  po_id uuid,
+  po_status text NOT NULL DEFAULT 'pending'::text,
+  exclusion_reason text,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT users_pkey PRIMARY KEY (id)
+  approved_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT approved_indent_items_pkey PRIMARY KEY (id),
+  CONSTRAINT approved_indent_items_indent_id_fkey FOREIGN KEY (indent_id) REFERENCES public.indents(id),
+  CONSTRAINT approved_indent_items_po_id_fkey FOREIGN KEY (po_id) REFERENCES public.purchase_orders(id)
 );
-CREATE TABLE public.vendors (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  party_name text NOT NULL,
-  address text,
-  gstin text,
-  contact_name text,
-  contact text,
-  email text,
-  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT vendors_pkey PRIMARY KEY (id)
+CREATE TABLE public.item_list (
+  item_name text,
+  bc_s integer,
+  ml_s integer,
+  id integer GENERATED ALWAYS AS IDENTITY NOT NULL UNIQUE,
+  CONSTRAINT item_list_pkey PRIMARY KEY (id)
 );

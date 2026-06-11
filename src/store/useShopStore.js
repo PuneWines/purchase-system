@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const SHOPS = ["FRIENDS", "VISHAL", "MADHURA", "KUNAL", "BALAJI"];
+const SHOPS = ["FRIENDS", "The Liquor Story - Vishal - Hinjewadi", "MADHURA", "KUNAL", "BALAJI"];
 
 const getInitialShop = () => {
   try {

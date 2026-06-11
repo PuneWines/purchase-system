@@ -390,7 +390,7 @@ const Indent = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStep, setUploadStep] = useState(1); // 1: Select Shop, 2: Upload File
 
-  const shops = ["FRIENDS", "VISHAL", "MADHURA", "KUNAL", "BALAJI"];
+  const shops = ["FRIENDS", "The Liquor Story - Vishal - Hinjewadi", "MADHURA", "KUNAL", "BALAJI"];
   const fileInputRef = useRef(null);
 
   // Calculate statistics

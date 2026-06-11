@@ -74,27 +74,27 @@ const Sidebar = () => {
   };
 
   const shopColorClass = (shop) => {
-    switch (shop) {
-      case "All":      return "pill-all";
-      case "FRIENDS":  return "pill-friends";
-      case "VISHAL":   return "pill-vishal";
-      case "MADHURA":  return "pill-madhura";
-      case "KUNAL":    return "pill-kunal";
-      case "BALAJI":   return "pill-balaji";
-      default:         return "pill-all";
-    }
+    if (!shop) return "pill-all";
+    const upper = shop.toUpperCase();
+    if (upper === "ALL") return "pill-all";
+    if (upper === "FRIENDS") return "pill-friends";
+    if (upper.includes("VISHAL")) return "pill-vishal";
+    if (upper === "MADHURA") return "pill-madhura";
+    if (upper === "KUNAL") return "pill-kunal";
+    if (upper === "BALAJI") return "pill-balaji";
+    return "pill-all";
   };
 
   const shopDotClass = (shop) => {
-    switch (shop) {
-      case "All":      return "shop-dot-all";
-      case "FRIENDS":  return "shop-dot-friends";
-      case "VISHAL":   return "shop-dot-vishal";
-      case "MADHURA":  return "shop-dot-madhura";
-      case "KUNAL":    return "shop-dot-kunal";
-      case "BALAJI":   return "shop-dot-balaji";
-      default:         return "shop-dot-all";
-    }
+    if (!shop) return "shop-dot-all";
+    const upper = shop.toUpperCase();
+    if (upper === "ALL") return "shop-dot-all";
+    if (upper === "FRIENDS") return "shop-dot-friends";
+    if (upper.includes("VISHAL")) return "shop-dot-vishal";
+    if (upper === "MADHURA") return "shop-dot-madhura";
+    if (upper === "KUNAL") return "shop-dot-kunal";
+    if (upper === "BALAJI") return "shop-dot-balaji";
+    return "shop-dot-all";
   };
 
   return (
