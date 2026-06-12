@@ -264,7 +264,7 @@ const TransporterPortal = () => {
 
       const updatePayload = {
         transporter_status: status,
-        pickup_date: status === "yes" ? pDate : null,
+        pickup_date: status === "yes" ? pDate : new Date().toISOString(),
         transporter_remarks: rem,
         delivered_items: status === "yes" ? deliveredItemsJSON : null,
         tp_number: status === "yes" ? tpNum : po.tp_number

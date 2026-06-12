@@ -94,64 +94,95 @@ const TraderVerification = () => {
     fetchData();
   }, []);
 
-  const columns = [
-    { key: "po_number", label: "PO Number", sortable: true },
-    { key: "indent_id", label: "Indent ID", sortable: true },
-    { key: "shop_name", label: "Shop Name", sortable: true },
-    { key: "vendor_name", label: "Vendor Name", sortable: true },
-    { key: "total_items", label: "Total Items", sortable: true },
-    { key: "total_order_qty", label: "Total Order Qty (Bottels)", sortable: true },
-    { key: "total_order_box", label: "Total Order Box", sortable: true },
-    {
-      key: "trader_item_statuses",
-      label: "Item Approvals",
-      sortable: false,
-      render: (statuses) => {
-        if (!statuses || typeof statuses !== 'object' || Object.keys(statuses).length === 0) {
-          return <span style={{ color: "#94a3b8" }}>—</span>;
+  const columns = useMemo(() => {
+    const baseColumns = [
+      { key: "po_number", label: "PO Number", sortable: true },
+      { 
+        key: "created_at", 
+        label: "PO Created Date", 
+        sortable: true,
+        render: (date) => date ? new Date(date).toLocaleString("en-IN", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hour12: true
+        }) : <span style={{ color: "#94a3b8" }}>—</span>
+      },
+      { key: "shop_name", label: "Shop Name", sortable: true },
+      { key: "vendor_name", label: "Vendor Name", sortable: true },
+      { key: "total_items", label: "Total Items", sortable: true },
+      { key: "total_order_qty", label: "Total Order Qty (Bottles)", sortable: true },
+      { key: "total_order_box", label: "Total Order Box", sortable: true },
+      {
+        key: "trader_item_statuses",
+        label: "Item Approvals",
+        sortable: false,
+        render: (statuses) => {
+          if (!statuses || typeof statuses !== 'object' || Object.keys(statuses).length === 0) {
+            return <span style={{ color: "#94a3b8" }}>—</span>;
+          }
+          const values = Object.values(statuses);
+          const approvedCount = values.filter(v => v === 'approved').length;
+          const rejectedCount = values.filter(v => v === 'rejected').length;
+          return (
+            <span style={{ fontWeight: "600", fontSize: "13px" }}>
+              {approvedCount > 0 && <span style={{ color: "#16a34a" }}>{approvedCount} ✅ </span>}
+              {rejectedCount > 0 && <span style={{ color: "#dc2626" }}>{rejectedCount} ❌</span>}
+            </span>
+          );
         }
-        const values = Object.values(statuses);
-        const approvedCount = values.filter(v => v === 'approved').length;
-        const rejectedCount = values.filter(v => v === 'rejected').length;
-        return (
-          <span style={{ fontWeight: "600", fontSize: "13px" }}>
-            {approvedCount > 0 && <span style={{ color: "#16a34a" }}>{approvedCount} ✅ </span>}
-            {rejectedCount > 0 && <span style={{ color: "#dc2626" }}>{rejectedCount} ❌</span>}
-          </span>
-        );
-      }
-    },
-    {
-      key: "trader_pdf_url",
-      label: "Trader PDF",
-      sortable: false,
-      render: (url) => url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0052cc', textDecoration: 'none', fontWeight: 600 }}>
-          <FileText size={16} /> View Trader
-        </a>
-      ) : <span style={{ color: '#94a3b8' }}>N/A</span>
-    },
-    { 
-      key: "trader_status", 
-      label: "Trader Status", 
-      sortable: true,
-      render: (status) => {
-        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Approved</span>;
-        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
-        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
-      }
-    },
-    { 
-      key: "dispatch_date", 
-      label: "Dispatch Date & Time", 
-      sortable: true,
-      render: (date) => date ? new Date(date).toLocaleString("en-IN", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: true
-      }) : <span style={{ color: "#94a3b8" }}>—</span>
-    },
-    { key: "remarks", label: "Trader Remarks", sortable: false }
-  ];
+      },
+      {
+        key: "trader_pdf_url",
+        label: "Trader PDF",
+        sortable: false,
+        render: (url) => url ? (
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0052cc', textDecoration: 'none', fontWeight: 600 }}>
+            <FileText size={16} /> View Trader
+          </a>
+        ) : <span style={{ color: '#94a3b8' }}>N/A</span>
+      },
+      { 
+        key: "trader_status", 
+        label: "Trader Status", 
+        sortable: true,
+        render: (status) => {
+          if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Approved</span>;
+          if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+          return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
+        }
+      },
+      { 
+        key: "dispatch_date", 
+        label: "Dispatch Date & Time", 
+        sortable: true,
+        render: (date, row) => {
+          if (row.trader_status === "no") return <span style={{ color: "#94a3b8" }}>—</span>;
+          return date ? new Date(date).toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true
+          }) : <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+      },
+      { key: "remarks", label: "Trader Remarks", sortable: false }
+    ];
+
+    if (activeTab === "history") {
+      const idx = baseColumns.findIndex(col => col.key === "trader_status");
+      baseColumns.splice(idx + 1, 0, {
+        key: "submission_time",
+        label: "Submission Time",
+        sortable: true,
+        render: (_, row) => {
+          const date = row.dispatch_date;
+          return date ? new Date(date).toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true
+          }) : <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+      });
+    }
+
+    return baseColumns;
+  }, [activeTab]);
 
   const filteredData = useMemo(() => {
     if (selectedShop === "All") return data;
@@ -218,7 +249,7 @@ const TraderVerification = () => {
           data={currentTabData}
           columns={columns}
           title={activeTab === 'pending' ? "Pending Trader Approvals" : "Trader Approvals History"}
-          searchableColumns={["po_number", "indent_id", "shop_name", "vendor_name", "total_items"]}
+          searchableColumns={["po_number", "shop_name", "vendor_name", "total_items"]}
           showHeader={false}
         />
       )}

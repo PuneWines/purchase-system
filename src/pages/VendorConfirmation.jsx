@@ -101,7 +101,7 @@ const VendorConfirmation = () => {
       const isKunalShop = shopName?.toUpperCase() === "KUNAL";
       const updatePayload = {
         trader_status: status,
-        dispatch_date: dispatchDate || null,
+        dispatch_date: status === "no" ? new Date().toISOString() : (dispatchDate || null),
         remarks: remarks || null
       };
 

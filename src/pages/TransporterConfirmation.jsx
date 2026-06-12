@@ -75,7 +75,7 @@ const TransporterConfirmation = () => {
         .from("purchase_orders")
         .update({
           transporter_status: status,
-          pickup_date: pickupDate || null,
+          pickup_date: status === "no" ? new Date().toISOString() : (pickupDate || null),
           transporter_remarks: remarks || null
         })
         .eq("id", id);

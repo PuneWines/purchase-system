@@ -298,7 +298,7 @@ const VendorPortal = () => {
       return;
     }
 
-    const finalDispatchDate = allRejected ? null : combineDateWithCurrentTime(dDate);
+    const finalDispatchDate = allRejected ? new Date().toISOString() : combineDateWithCurrentTime(dDate);
 
     setSubmittingPoId(poId);
 

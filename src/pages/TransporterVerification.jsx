@@ -83,56 +83,105 @@ const TransporterVerification = () => {
     fetchData();
   }, []);
 
-  const columns = [
-    { key: "po_number", label: "PO Number", sortable: true },
-    { key: "shop_name", label: "Shop Name", sortable: true },
-    { key: "vendor_name", label: "Vendor Name", sortable: true },
-    {
-      key: "pickedUpCount",
-      label: "Items Picked Up",
-      sortable: true,
-      render: (count, row) => {
-        if (row.transporter_status === "yes") {
-          return <span style={{ fontWeight: "600", color: "#16a34a" }}>{count}</span>;
+  const columns = useMemo(() => {
+    const baseColumns = [
+      { key: "po_number", label: "PO Number", sortable: true },
+      { 
+        key: "created_at", 
+        label: "PO Created Date", 
+        sortable: true,
+        render: (date) => date ? new Date(date).toLocaleString("en-IN", {
+          day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hour12: true
+        }) : <span style={{ color: "#94a3b8" }}>—</span>
+      },
+      { key: "shop_name", label: "Shop Name", sortable: true },
+      { key: "vendor_name", label: "Vendor Name", sortable: true },
+      {
+        key: "pickedUpCount",
+        label: "Items Picked Up",
+        sortable: true,
+        render: (count, row) => {
+          if (row.transporter_status === "yes") {
+            return <span style={{ fontWeight: "600", color: "#16a34a" }}>{count}</span>;
+          }
+          if (row.transporter_status === "no") {
+            return <span style={{ color: "#dc2626" }}>0</span>;
+          }
+          return <span style={{ color: "#94a3b8" }}>—</span>;
         }
-        if (row.transporter_status === "no") {
-          return <span style={{ color: "#dc2626" }}>0</span>;
+      },
+      { key: "transporter_number", label: "Transporter Contact", sortable: true },
+      {
+        key: "tp_number",
+        label: "TP Number",
+        sortable: true,
+        render: (tp) => tp || <span style={{ color: "#94a3b8" }}>—</span>
+      },
+      {
+        key: "trader_pdf_url",
+        label: "PO PDF",
+        sortable: false,
+        render: (url) => url ? (
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0052cc', textDecoration: 'none', fontWeight: 600 }}>
+            <FileText size={16} /> View Document
+          </a>
+        ) : <span style={{ color: '#94a3b8' }}>N/A</span>
+      },
+      { 
+        key: "transporter_status", 
+        label: "Transporter Status", 
+        sortable: true,
+        render: (status, row) => {
+          if (row.trader_status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+          if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Picked-up</span>;
+          if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
+          return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
         }
-        return <span style={{ color: "#94a3b8" }}>—</span>;
-      }
-    },
-    { key: "transporter_number", label: "Transporter Contact", sortable: true },
-    {
-      key: "tp_number",
-      label: "TP Number",
-      sortable: true,
-      render: (tp) => tp || <span style={{ color: "#94a3b8" }}>—</span>
-    },
-    {
-      key: "trader_pdf_url",
-      label: "PO PDF",
-      sortable: false,
-      render: (url) => url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0052cc', textDecoration: 'none', fontWeight: 600 }}>
-          <FileText size={16} /> View Document
-        </a>
-      ) : <span style={{ color: '#94a3b8' }}>N/A</span>
-    },
-    { 
-      key: "transporter_status", 
-      label: "Transporter Status", 
-      sortable: true,
-      render: (status, row) => {
-        if (row.trader_status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
-        if (status === "yes") return <span style={{ color: "#16a34a", fontWeight: "600" }}>Picked-up</span>;
-        if (status === "no") return <span style={{ color: "#dc2626", fontWeight: "600" }}>Rejected</span>;
-        return <span style={{ color: "#eab308", fontWeight: "600" }}>Pending</span>;
-      }
-    },
-    { key: "pickup_date", label: "Pick-up Date", sortable: true },
-    { key: "delivery_date", label: "Est. Delivery", sortable: true },
-    { key: "transporter_remarks", label: "Remarks", sortable: false }
-  ];
+      },
+      { 
+        key: "pickup_date", 
+        label: "Pick-up Date", 
+        sortable: true,
+        render: (date, row) => {
+          if (row.transporter_status === "no") return <span style={{ color: "#94a3b8" }}>—</span>;
+          return date ? new Date(date).toLocaleDateString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric"
+          }) : <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+      },
+      { 
+        key: "delivery_date", 
+        label: "Est. Delivery", 
+        sortable: true,
+        render: (date, row) => {
+          if (row.transporter_status === "no") return <span style={{ color: "#94a3b8" }}>—</span>;
+          return date ? new Date(date).toLocaleDateString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric"
+          }) : <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+      },
+      { key: "transporter_remarks", label: "Remarks", sortable: false }
+    ];
+
+    if (activeTab === "history") {
+      const idx = baseColumns.findIndex(col => col.key === "transporter_status");
+      baseColumns.splice(idx + 1, 0, {
+        key: "submission_time",
+        label: "Submission Time",
+        sortable: true,
+        render: (_, row) => {
+          const date = row.pickup_date;
+          return date ? new Date(date).toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true
+          }) : <span style={{ color: "#94a3b8" }}>—</span>;
+        }
+      });
+    }
+
+    return baseColumns;
+  }, [activeTab]);
 
   const filteredData = useMemo(() => {
     const nonKunalData = data.filter(item => item.shop_name?.toUpperCase() !== "KUNAL");
