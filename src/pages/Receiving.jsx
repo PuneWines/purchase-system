@@ -1,48 +1,40 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../../utils/supabase";
-import { 
-  FileText, 
-  ChevronDown, 
-  ChevronUp, 
-  Check, 
-  AlertCircle, 
-  CheckCircle2, 
-  Search, 
-  Save, 
-  Inbox, 
-  TrendingDown, 
+import {
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  CheckCircle2,
+  Search,
+  Save,
+  Inbox,
+  TrendingDown,
   TrendingUp,
   Package,
-  Calendar,
-  User,
-  MessageSquare
+  MessageSquare,
 } from "lucide-react";
 import Toast, { useToast } from "../components/Toast";
 import useShopStore from "../store/useShopStore";
-import "../styles/Pages.css";
-import "../styles/Receiving.css";
 
 const Receiving = () => {
   const [data, setData] = useState([]);
   const [itemsData, setItemsData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("pending"); // "pending" or "history"
+  const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const { selectedShop } = useShopStore();
-  
-  // Local editing states
-  const [editingQtys, setEditingQtys] = useState({}); // { [poId]: { [itemId]: number } }
-  const [editingRemarks, setEditingRemarks] = useState({}); // { [poId]: string }
-  const [expandedPoIds, setExpandedPoIds] = useState({}); // { [poId]: boolean }
+
+  const [editingQtys, setEditingQtys] = useState({});
+  const [editingRemarks, setEditingRemarks] = useState({});
+  const [expandedPoIds, setExpandedPoIds] = useState({});
   const [savingPoId, setSavingPoId] = useState(null);
 
-  // Toast notifications
   const { toasts, addToast, removeToast } = useToast();
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch Purchase Orders
       const { data: poData, error: poError } = await supabase
         .from("purchase_orders")
         .select("*")
@@ -51,23 +43,15 @@ const Receiving = () => {
       if (poError) throw poError;
 
       if (poData && poData.length > 0) {
-        // Fetch indents, indent_items, and approved_indent_items to resolve shop_name
         const { data: indents } = await supabase.from("indents").select("id, shop_name");
         const [resItems, resApproved] = await Promise.all([
           supabase.from("indent_items").select("indent_id, unique_indent_id"),
-          supabase.from("approved_indent_items").select("indent_id, unique_indent_id")
+          supabase.from("approved_indent_items").select("indent_id, unique_indent_id"),
         ]);
         const itemsAll = [...(resItems.data || []), ...(resApproved.data || [])];
-
-        const indentMap = (indents || []).reduce((acc, ind) => {
-          acc[ind.id] = ind.shop_name;
-          return acc;
-        }, {});
-
+        const indentMap = (indents || []).reduce((acc, ind) => { acc[ind.id] = ind.shop_name; return acc; }, {});
         const itemMap = (itemsAll || []).reduce((acc, item) => {
-          if (item.unique_indent_id && item.indent_id) {
-            acc[item.unique_indent_id] = item.indent_id;
-          }
+          if (item.unique_indent_id && item.indent_id) acc[item.unique_indent_id] = item.indent_id;
           return acc;
         }, {});
 
@@ -77,42 +61,23 @@ const Receiving = () => {
             const parentIndentId = itemMap[po.indent_id];
             shopName = parentIndentId ? (indentMap[parentIndentId] || "Unknown") : "Unknown";
           }
-          return {
-            ...po,
-            shop_name: shopName
-          };
+          return { ...po, shop_name: shopName };
         });
 
         setData(enrichedPoData);
 
-        // 2. Fetch approved indent items associated with the POs
         const poIds = poData.map(po => po.id).filter(Boolean);
         const indentIds = poData.map(po => po.indent_id).filter(Boolean);
-
         const promises = [];
-        if (poIds.length > 0) {
-          promises.push(
-            supabase.from("approved_indent_items").select("*").in("po_id", poIds).neq("po_status", "excluded")
-          );
-        }
-        if (indentIds.length > 0) {
-          promises.push(
-            supabase.from("approved_indent_items").select("*").in("unique_indent_id", indentIds).neq("po_status", "excluded")
-          );
-        }
+        if (poIds.length > 0) promises.push(supabase.from("approved_indent_items").select("*").in("po_id", poIds).neq("po_status", "excluded"));
+        if (indentIds.length > 0) promises.push(supabase.from("approved_indent_items").select("*").in("unique_indent_id", indentIds).neq("po_status", "excluded"));
 
         const results = await Promise.all(promises);
         const allItemsMap = new Map();
-
         results.forEach(res => {
           if (res.error) throw res.error;
-          if (res.data) {
-            res.data.forEach(item => {
-              allItemsMap.set(item.id, item);
-            });
-          }
+          if (res.data) res.data.forEach(item => allItemsMap.set(item.id, item));
         });
-
         setItemsData(Array.from(allItemsMap.values()));
       } else {
         setData([]);
@@ -126,23 +91,13 @@ const Receiving = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // Helper to resolve items for a PO
   const getPoItemsData = (po) => {
-    // 1. Try to load from po.po_items primarily
     let poItemsList = po.po_items;
     if (typeof poItemsList === "string") {
-      try {
-        poItemsList = JSON.parse(poItemsList);
-      } catch (e) {
-        console.error("Failed to parse po_items string:", e);
-        poItemsList = null;
-      }
+      try { poItemsList = JSON.parse(poItemsList); } catch (e) { poItemsList = null; }
     }
-
     if (poItemsList && Array.isArray(poItemsList) && poItemsList.length > 0) {
       return poItemsList.map(item => {
         const orderQty = item.orderQty !== undefined ? parseFloat(item.orderQty) : parseFloat(item.order_qty || 0);
@@ -150,506 +105,380 @@ const Receiving = () => {
         const brandName = item.brandName || item.brand_name || itemName;
         const closingQty = item.closingQty !== undefined ? item.closingQty : (item.closing_qty !== undefined ? item.closing_qty : "—");
         const bcs = item.bcs ? parseFloat(item.bcs) : null;
-        
-        // Determine received qty stored in database
-        const dbReceivedQty = po.received_items?.[item.id]?.receivedQty !== undefined
-          ? Number(po.received_items[item.id].receivedQty)
-          : 0;
-
-        return {
-          id: item.id,
-          itemName,
-          brandName,
-          orderQty,
-          dbReceivedQty,
-          closingQty: closingQty != null ? closingQty : "—",
-          bcs
-        };
+        const dbReceivedQty = po.received_items?.[item.id]?.receivedQty !== undefined ? Number(po.received_items[item.id].receivedQty) : 0;
+        return { id: item.id, itemName, brandName, orderQty, dbReceivedQty, closingQty: closingQty != null ? closingQty : "—", bcs };
       });
     }
-
-    // 2. Fallback to approved_indent_items if po_items is empty/missing
     if (!itemsData || itemsData.length === 0) return [];
     return itemsData
-      .filter(item => 
-        (item.po_id === po.id || (item.unique_indent_id === po.indent_id && item.party_name?.toLowerCase() === po.vendor_name?.toLowerCase())) &&
-        (parseFloat(item.order_qty) || 0) > 0
-      )
+      .filter(item => (item.po_id === po.id || (item.unique_indent_id === po.indent_id && item.party_name?.toLowerCase() === po.vendor_name?.toLowerCase())) && (parseFloat(item.order_qty) || 0) > 0)
       .map(item => {
         const orderQty = parseFloat(item.order_qty) || 0;
-        // Determine received qty stored in database
-        const dbReceivedQty = po.received_items?.[item.id]?.receivedQty !== undefined
-          ? Number(po.received_items[item.id].receivedQty)
-          : 0;
-        
-        return {
-          id: item.id,
-          itemName: item.item_name,
-          brandName: item.brand_name || item.item_name,
-          orderQty: orderQty,
-          dbReceivedQty: dbReceivedQty,
-          closingQty: item.closing_qty != null ? item.closing_qty : "—",
-          bcs: item.bcs ? parseFloat(item.bcs) : null
-        };
+        const dbReceivedQty = po.received_items?.[item.id]?.receivedQty !== undefined ? Number(po.received_items[item.id].receivedQty) : 0;
+        return { id: item.id, itemName: item.item_name, brandName: item.brand_name || item.item_name, orderQty, dbReceivedQty, closingQty: item.closing_qty != null ? item.closing_qty : "—", bcs: item.bcs ? parseFloat(item.bcs) : null };
       });
   };
 
-  // Toggle card expansion
-  const toggleExpand = (poId) => {
-    setExpandedPoIds(prev => ({
-      ...prev,
-      [poId]: !prev[poId]
-    }));
-  };
-
-  // Update received quantity locally in memory
+  const toggleExpand = (poId) => setExpandedPoIds(prev => ({ ...prev, [poId]: !prev[poId] }));
   const handleQtyChange = (poId, itemId, value) => {
-    const numVal = value === "" ? "" : Number(value);
-    setEditingQtys(prev => ({
-      ...prev,
-      [poId]: {
-        ...prev[poId],
-        [itemId]: numVal
-      }
-    }));
+    setEditingQtys(prev => ({ ...prev, [poId]: { ...prev[poId], [itemId]: value === "" ? "" : Number(value) } }));
   };
-
-  const handleDecrement = (poId, itemId, currentVal) => {
-    const current = currentVal === "" ? 0 : Number(currentVal);
-    const newVal = Math.max(0, current - 1);
-    handleQtyChange(poId, itemId, newVal);
-  };
-
-  const handleIncrement = (poId, itemId, currentVal) => {
-    const current = currentVal === "" ? 0 : Number(currentVal);
-    const newVal = current + 1;
-    handleQtyChange(poId, itemId, newVal);
-  };
-
-  // Quick match single product quantity
-  const handleMatchProduct = (poId, itemId, orderQty) => {
-    handleQtyChange(poId, itemId, orderQty);
-  };
-
-  // Quick match all pending items inside a single PO locally
+  const handleDecrement = (poId, itemId, currentVal) => handleQtyChange(poId, itemId, Math.max(0, (currentVal === "" ? 0 : Number(currentVal)) - 1));
+  const handleIncrement = (poId, itemId, currentVal) => handleQtyChange(poId, itemId, (currentVal === "" ? 0 : Number(currentVal)) + 1);
+  const handleMatchProduct = (poId, itemId, orderQty) => handleQtyChange(poId, itemId, orderQty);
   const handleMatchAllForPo = (po, pendingProducts) => {
     const poEdits = {};
-    pendingProducts.forEach(p => {
-      poEdits[p.id] = p.orderQty;
-    });
-
-    setEditingQtys(prev => ({
-      ...prev,
-      [po.id]: {
-        ...prev[po.id],
-        ...poEdits
-      }
-    }));
-    addToast(`Matched all pending items for PO ${po.po_number} in view.`, "info");
+    pendingProducts.forEach(p => { poEdits[p.id] = p.orderQty; });
+    setEditingQtys(prev => ({ ...prev, [po.id]: { ...prev[po.id], ...poEdits } }));
+    addToast(`Matched all pending items for PO ${po.po_number}.`, "info");
   };
+  const handleRemarksChange = (poId, value) => setEditingRemarks(prev => ({ ...prev, [poId]: value }));
 
-  // Update Remarks locally
-  const handleRemarksChange = (poId, value) => {
-    setEditingRemarks(prev => ({
-      ...prev,
-      [poId]: value
-    }));
-  };
-
-  // Save PO changes to Supabase
   const handleSavePo = async (po, poProducts) => {
     setSavingPoId(po.id);
     try {
-      const existingMap = po.received_items && typeof po.received_items === 'object' ? { ...po.received_items } : {};
-      
       const updatedMap = {};
       poProducts.forEach(p => {
-        const dbValue = p.dbReceivedQty;
-        // Read local edit, if none exists fallback to dbValue
-        const editedValue = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : dbValue;
-        
-        updatedMap[p.id] = {
-          itemName: p.itemName,
-          orderQty: p.orderQty,
-          receivedQty: editedValue === "" ? 0 : Number(editedValue)
-        };
+        const editedValue = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : p.dbReceivedQty;
+        updatedMap[p.id] = { itemName: p.itemName, orderQty: p.orderQty, receivedQty: editedValue === "" ? 0 : Number(editedValue) };
       });
-
       const remarks = editingRemarks[po.id] !== undefined ? editingRemarks[po.id] : (po.receiver_remarks || "");
-
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({
-          received_items: updatedMap,
-          receiver_status: "yes",
-          receiver_remarks: remarks || null
-        })
-        .eq("id", po.id);
-
+      const { error } = await supabase.from("purchase_orders").update({ received_items: updatedMap, receiver_status: "yes", receiver_remarks: remarks || null }).eq("id", po.id);
       if (error) throw error;
-
-      addToast(`Successfully saved received quantities for PO ${po.po_number}!`, "success");
-      
-      // Refresh page data to reflect the changes in tabs
+      addToast(`Saved quantities for PO ${po.po_number}.`, "success");
       await fetchData();
     } catch (err) {
-      console.error("Error updating PO:", err);
-      addToast("Failed to save received quantities: " + err.message, "error");
+      addToast("Failed to save: " + err.message, "error");
     } finally {
       setSavingPoId(null);
     }
   };
 
-  // Filter data by selected global shop name
-  const shopFilteredData = useMemo(() => {
-    if (selectedShop === "All") return data;
-    return data.filter(po => po.shop_name === selectedShop);
-  }, [data, selectedShop]);
+  const shopFilteredData = useMemo(() => selectedShop === "All" ? data : data.filter(po => po.shop_name === selectedShop), [data, selectedShop]);
 
-  // Map and categorize purchase orders based on their DB snapshot products
   const poRecords = useMemo(() => {
     return shopFilteredData.map(po => {
       const products = getPoItemsData(po);
-      const pendingProducts = products.filter(p => p.dbReceivedQty !== p.orderQty);
-      const historyProducts = products.filter(p => p.dbReceivedQty === p.orderQty);
-
       return {
         po,
         products,
-        pendingProducts,
-        historyProducts
+        pendingProducts: products.filter(p => p.dbReceivedQty !== p.orderQty),
+        historyProducts: products.filter(p => p.dbReceivedQty === p.orderQty),
       };
-    }).filter(record => record.products.length > 0); // Only process POs that actually have products
+    }).filter(r => r.products.length > 0);
   }, [shopFilteredData, itemsData]);
 
-  // Filter records based on search query
   const filteredRecords = poRecords.filter(record => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      record.po.po_number?.toLowerCase().includes(query) ||
-      record.po.vendor_name?.toLowerCase().includes(query) ||
-      record.po.shop_name?.toLowerCase().includes(query)
-    );
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return record.po.po_number?.toLowerCase().includes(q) || record.po.vendor_name?.toLowerCase().includes(q) || record.po.shop_name?.toLowerCase().includes(q);
   });
 
-  // Calculate totals and tab counts
-  const pendingTabRecords = filteredRecords.filter(record => record.pendingProducts.length > 0);
-  const historyTabRecords = filteredRecords.filter(record => record.historyProducts.length > 0);
-
-  const pendingCount = poRecords.filter(record => record.pendingProducts.length > 0).length;
-  const historyCount = poRecords.filter(record => record.historyProducts.length > 0).length;
-
-  // Active records to display based on selected tab
+  const pendingTabRecords = filteredRecords.filter(r => r.pendingProducts.length > 0);
+  const historyTabRecords = filteredRecords.filter(r => r.historyProducts.length > 0);
+  const pendingCount = poRecords.filter(r => r.pendingProducts.length > 0).length;
+  const historyCount = poRecords.filter(r => r.historyProducts.length > 0).length;
   const activeRecords = activeTab === "pending" ? pendingTabRecords : historyTabRecords;
 
-  // Helper to generate the difference badge
-  const renderDiffBadge = (diff) => {
-    if (diff === 0) {
-      return (
-        <span className="discrepancy-badge match">
-          <Check size={12} /> Perfect Match
-        </span>
-      );
-    }
-    if (diff < 0) {
-      return (
-        <span className="discrepancy-badge shortage">
-          <TrendingDown size={12} /> {diff} Bottles
-        </span>
-      );
-    }
+  const DiffBadge = ({ diff }) => {
+    if (diff === 0) return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+        <Check size={10} /> Match
+      </span>
+    );
+    if (diff < 0) return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+        <TrendingDown size={10} /> {diff}
+      </span>
+    );
     return (
-      <span className="discrepancy-badge surplus">
-        <TrendingUp size={12} /> +{diff} Bottles
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+        <TrendingUp size={10} /> +{diff}
       </span>
     );
   };
 
   return (
-    <div className="page-container">
-      <div className="receiving-container">
-        <h1>Receiving Verification</h1>
-        <p className="page-description">
-          Audit and manage incoming purchase order inventory. Easily log received quantities, verify item matches, and track discrepancies.
-        </p>
+    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-        {/* Controls and Tabs Row */}
-        <div className="receiving-controls-header">
-          {/* Dual Tabs */}
-          <div className="receiving-tabs">
-            <button 
-              className={`receiving-tab-btn ${activeTab === "pending" ? "active" : ""}`}
-              onClick={() => setActiveTab("pending")}
-            >
-              <span>Pending Deliveries</span>
-              <span className="tab-badge">{pendingCount}</span>
-            </button>
-            <button 
-              className={`receiving-tab-btn ${activeTab === "history" ? "active" : ""}`}
-              onClick={() => setActiveTab("history")}
-            >
-              <span>History Logs</span>
-              <span className="tab-badge">{historyCount}</span>
-            </button>
+        {/* Page Header */}
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Receiving</h1>
+          <p className="text-sm text-slate-500">Log received quantities and track delivery discrepancies.</p>
+        </div>
+
+        {/* Controls Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Tabs */}
+          <div className="flex bg-white border border-slate-200 rounded-lg p-1 w-fit shadow-sm">
+            {[
+              { key: "pending", label: "Pending", count: pendingCount },
+              { key: "history", label: "History", count: historyCount },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  activeTab === tab.key
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {tab.label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                  activeTab === tab.key ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* Search bar */}
-          <div className="search-container">
-            <Search className="search-icon" size={18} />
+          {/* Search */}
+          <div className="relative sm:ml-auto">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              className="search-input"
-              placeholder="Search PO number or vendor..."
+              placeholder="Search PO or vendor…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm w-64"
             />
           </div>
         </div>
 
-        {/* Loading Spinner */}
+        {/* Content */}
         {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
-            <div style={{ display: 'inline-block', width: '30px', height: '30px', border: '3px solid #e2e8f0', borderTopColor: '#4f46e5', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '12px' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <div>Loading purchase orders...</div>
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+            <div className="w-7 h-7 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin" />
+            <span className="text-sm">Loading orders…</span>
           </div>
         ) : activeRecords.length === 0 ? (
-          /* Premium Graceful Empty State */
-          <div className="illustrated-empty-state">
-            <div className="empty-state-icon-container">
-              {activeTab === "pending" ? <CheckCircle2 size={32} style={{ color: "#10b981" }} /> : <Inbox size={32} />}
+          <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              {activeTab === "pending" ? <CheckCircle2 size={22} className="text-emerald-500" /> : <Inbox size={22} className="text-slate-400" />}
             </div>
-            <h3 className="empty-state-title">
-              {activeTab === "pending" 
-                ? "All Deliveries Fully Verified" 
-                : "No History Records Found"}
-            </h3>
-            <p className="empty-state-desc">
+            <p className="text-sm font-medium text-slate-700">
+              {activeTab === "pending" ? "All deliveries verified" : "No history yet"}
+            </p>
+            <p className="text-xs text-slate-400 max-w-xs">
               {activeTab === "pending"
-                ? "Perfect! There are currently no purchase orders with pending discrepancy shortages."
-                : "No fully verified logs are available. Verify pending purchase orders to add logs to history."}
+                ? "No purchase orders with pending items."
+                : "Verified purchase orders will appear here."}
             </p>
           </div>
         ) : (
-          /* Cards List */
-          activeRecords.map(({ po, products, pendingProducts, historyProducts }) => {
-            const isExpanded = !!expandedPoIds[po.id];
-            
-            // Choose items to render in list based on active tab
-            const targetProducts = activeTab === "pending" ? pendingProducts : historyProducts;
+          <div className="space-y-3">
+            {activeRecords.map(({ po, products, pendingProducts, historyProducts }) => {
+              const isExpanded = !!expandedPoIds[po.id];
+              const targetProducts = activeTab === "pending" ? pendingProducts : historyProducts;
 
-            // Calculate PO Meta totals
-            const totalOrderQty = products.reduce((sum, p) => sum + p.orderQty, 0);
-            const totalReceivedQty = products.reduce((sum, p) => {
-              const displayVal = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : p.dbReceivedQty;
-              return sum + (displayVal === "" ? 0 : Number(displayVal));
-            }, 0);
-            const difference = totalReceivedQty - totalOrderQty;
+              const totalOrderQty = products.reduce((s, p) => s + p.orderQty, 0);
+              const totalReceivedQty = products.reduce((s, p) => {
+                const v = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : p.dbReceivedQty;
+                return s + (v === "" ? 0 : Number(v));
+              }, 0);
+              const difference = totalReceivedQty - totalOrderQty;
+              const finalPdfUrl = po.receiver_pdf_url || po.trader_pdf_url;
+              const formattedDate = new Date(po.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-            const finalPdfUrl = po.receiver_pdf_url || po.trader_pdf_url;
-            const formattedDate = new Date(po.created_at).toLocaleDateString("en-IN", {
-              day: "2-digit", month: "short", year: "numeric",
-              hour: "2-digit", minute: "2-digit"
-            });
+              return (
+                <div key={po.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 
-            return (
-              <div key={po.id} className={`po-card ${isExpanded ? "expanded" : ""}`}>
-                {/* Header Section (Always Visible) */}
-                <div className="po-card-header" onClick={() => toggleExpand(po.id)}>
-                  <div className="po-header-main">
-                    <span className="po-number-badge">
-                      <Package size={20} style={{ color: "#4f46e5" }} />
-                      {po.po_number}
-                    </span>
-                    <span className="po-vendor">{po.vendor_name}</span>
-                  </div>
+                  {/* Card Header */}
+                  <div
+                    className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+                    onClick={() => toggleExpand(po.id)}
+                  >
+                    {/* PO Icon */}
+                    <div className="w-9 h-9 flex-shrink-0 bg-indigo-50 rounded-lg flex items-center justify-center">
+                      <Package size={16} className="text-indigo-600" />
+                    </div>
 
-                  {/* Desktop Meta Stats */}
-                  <div className="po-meta-grid">
-                    <div className="po-meta-item">
-                      <span className="po-meta-label">PO Date</span>
-                      <span className="po-meta-value">{formattedDate}</span>
+                    {/* PO Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-slate-900">{po.po_number}</span>
+                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-sm text-slate-600 truncate">{po.vendor_name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                        <span className="text-xs text-slate-400">{formattedDate}</span>
+                        <span className="text-xs font-medium text-indigo-600">{po.shop_name}</span>
+                      </div>
                     </div>
-                    <div className="po-meta-item">
-                      <span className="po-meta-label">Shop Name</span>
-                      <span className="po-meta-value" style={{ fontWeight: '600', color: '#4f46e5' }}>{po.shop_name || "Unknown"}</span>
+
+                    {/* Stats */}
+                    <div className="hidden md:flex items-center gap-6 text-sm">
+                      <div className="text-center">
+                        <div className="text-xs text-slate-400 mb-0.5">Ordered</div>
+                        <div className="font-semibold text-slate-700">{totalOrderQty}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-slate-400 mb-0.5">Received</div>
+                        <div className={`font-semibold ${totalReceivedQty === totalOrderQty ? "text-emerald-600" : "text-indigo-600"}`}>{totalReceivedQty}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-slate-400 mb-0.5">Status</div>
+                        <DiffBadge diff={difference} />
+                      </div>
                     </div>
-                    <div className="po-meta-item">
-                      <span className="po-meta-label">Total Ordered</span>
-                      <span className="po-meta-value">{totalOrderQty} Qty</span>
-                    </div>
-                    <div className="po-meta-item">
-                      <span className="po-meta-label">Total Received</span>
-                      <span className="po-meta-value" style={{ color: totalReceivedQty === totalOrderQty ? "#059669" : "#4f46e5" }}>
-                        {totalReceivedQty} Qty
-                      </span>
-                    </div>
-                    <div className="po-meta-item">
-                      <span className="po-meta-label">Discrepancy</span>
-                      {renderDiffBadge(difference)}
-                    </div>
+
+                    {/* PDF link */}
                     {finalPdfUrl && (
-                      <div className="po-meta-item" onClick={(e) => e.stopPropagation()}>
-                        <a href={finalPdfUrl} target="_blank" rel="noopener noreferrer" className="po-doc-link">
-                          <FileText size={14} /> PDF
-                        </a>
-                      </div>
+                      <a
+                        href={finalPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hidden sm:flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 transition-colors px-2 py-1 rounded border border-slate-200 hover:border-indigo-300"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <FileText size={12} /> PDF
+                      </a>
                     )}
-                  </div>
 
-                  {/* Dropdown toggle Chevron */}
-                  <button className="po-toggle-btn">
-                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                </div>
-
-                {/* Expanded Details Pane (Loads dynamically only when isExpanded is active) */}
-                {isExpanded && (
-                  <div className="po-card-body">
-                    <div className="products-table-wrapper">
-                      <table className="products-table">
-                        <thead>
-                          <tr>
-                            <th style={{ width: '60px', textAlign: 'center' }}>S.No</th>
-                            <th>Shop Name</th>
-                            <th>Item Name</th>
-                            <th>Brand</th>
-                            <th style={{ width: '130px', textAlign: 'center' }}>Closing Stock</th>
-                            <th style={{ width: '130px', textAlign: 'center' }}>Ordered Bottles</th>
-                            <th style={{ width: '280px', textAlign: 'center' }}>Received Bottles</th>
-                            <th style={{ width: '180px', textAlign: 'center' }}>Difference Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {targetProducts.map((p, idx) => {
-                            const displayVal = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : p.dbReceivedQty;
-                            const activeVal = displayVal === "" ? 0 : Number(displayVal);
-                            const diff = activeVal - p.orderQty;
-
-                            return (
-                              <tr key={p.id}>
-                                <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: '500' }}>{idx + 1}</td>
-                                <td style={{ fontWeight: '600', color: '#475569' }}>{po.shop_name || "Unknown"}</td>
-                                <td style={{ fontWeight: '600', color: '#1e293b' }}>{p.itemName}</td>
-                                <td style={{ color: '#64748b' }}>{p.brandName}</td>
-                                <td style={{ textAlign: 'center', color: '#475569' }}>{p.closingQty}</td>
-                                <td style={{ textAlign: 'center', fontWeight: '600' }}>{p.orderQty}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                  {activeTab === "pending" ? (
-                                    /* Interactive edit counters for Pending view */
-                                    <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                      <div className="qty-counter-group">
-                                        <button 
-                                          type="button" 
-                                          className="qty-counter-btn"
-                                          disabled={activeVal <= 0}
-                                          onClick={() => handleDecrement(po.id, p.id, displayVal)}
-                                        >
-                                          −
-                                        </button>
-                                        <input 
-                                          type="number" 
-                                          min="0"
-                                          className="qty-counter-input"
-                                          value={displayVal}
-                                          onChange={(e) => handleQtyChange(po.id, p.id, e.target.value)}
-                                        />
-                                        <button 
-                                          type="button" 
-                                          className="qty-counter-btn"
-                                          onClick={() => handleIncrement(po.id, p.id, displayVal)}
-                                        >
-                                          +
-                                        </button>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        className="btn-inline-match"
-                                        onClick={() => handleMatchProduct(po.id, p.id, p.orderQty)}
-                                        disabled={activeVal === p.orderQty}
-                                        title="Quick match to ordered quantity"
-                                      >
-                                        Match
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    /* Static green badge for read-only completed History products */
-                                    <span style={{ fontWeight: '600', color: '#059669', backgroundColor: '#ecfdf5', padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                                      {p.dbReceivedQty} Bottles
-                                    </span>
-                                  )}
-                                </td>
-                                <td style={{ textAlign: 'center' }}>
-                                  {renderDiffBadge(diff)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    {/* Chevron */}
+                    <div className="text-slate-400">
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-
-                    {/* Footer Controls inside card */}
-                    {activeTab === "pending" && (
-                      <div className="expanded-footer">
-                        {/* Remarks Form Area */}
-                        <div className="remarks-form-group">
-                          <label className="remarks-label" htmlFor={`remarks-${po.id}`}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <MessageSquare size={14} /> Remarks & Shortage Logs (Optional)
-                            </div>
-                          </label>
-                          <textarea
-                            id={`remarks-${po.id}`}
-                            className="remarks-textarea"
-                            rows={1}
-                            placeholder="Provide notes on damages, shortage details, or transportation delays..."
-                            value={editingRemarks[po.id] !== undefined ? editingRemarks[po.id] : (po.receiver_remarks || "")}
-                            onChange={(e) => handleRemarksChange(po.id, e.target.value)}
-                          />
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="actions-row">
-                          <button 
-                            type="button" 
-                            className="btn-match-all"
-                            onClick={() => handleMatchAllForPo(po, pendingProducts)}
-                          >
-                            ⚡ Match All Pending
-                          </button>
-                          <button 
-                            type="button" 
-                            className="btn-save-po"
-                            disabled={savingPoId === po.id}
-                            onClick={() => handleSavePo(po, products)}
-                          >
-                            <Save size={16} />
-                            {savingPoId === po.id ? "Saving..." : "Save Quantities"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Read-only remarks for History Logs */}
-                    {activeTab === "history" && po.receiver_remarks && (
-                      <div style={{ display: 'flex', gap: '8px', padding: '12px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', marginTop: '12px', fontSize: '0.85rem', color: '#475569' }}>
-                        <MessageSquare size={16} style={{ color: '#64748b', marginTop: '2px', flexShrink: 0 }} />
-                        <div>
-                          <strong style={{ color: '#1e293b' }}>Receiver Remarks:</strong> {po.receiver_remarks}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                )}
-              </div>
-            );
-          })
+
+                  {/* Expanded Body */}
+                  {isExpanded && (
+                    <div className="border-t border-slate-100">
+
+                      {/* Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100">
+                              <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3 w-10">#</th>
+                              <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3">Item</th>
+                              <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Brand</th>
+                              <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3 w-24">Closing</th>
+                              <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3 w-24">Ordered</th>
+                              <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3 w-52">Received</th>
+                              <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-4 py-3 w-28">Diff</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {targetProducts.map((p, idx) => {
+                              const displayVal = editingQtys[po.id]?.[p.id] !== undefined ? editingQtys[po.id][p.id] : p.dbReceivedQty;
+                              const activeVal = displayVal === "" ? 0 : Number(displayVal);
+                              const diff = activeVal - p.orderQty;
+
+                              return (
+                                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-5 py-3.5 text-xs text-slate-300 font-mono">{String(idx + 1).padStart(2, "0")}</td>
+                                  <td className="px-4 py-3.5 font-medium text-slate-800">{p.itemName}</td>
+                                  <td className="px-4 py-3.5 text-slate-500 hidden sm:table-cell">{p.brandName}</td>
+                                  <td className="px-4 py-3.5 text-center text-slate-500 font-mono text-xs">{p.closingQty}</td>
+                                  <td className="px-4 py-3.5 text-center font-semibold text-slate-700">{p.orderQty}</td>
+                                  <td className="px-4 py-3.5 text-center">
+                                    {activeTab === "pending" ? (
+                                      <div className="inline-flex items-center gap-2">
+                                        <div className="inline-flex items-center border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                          <button
+                                            type="button"
+                                            disabled={activeVal <= 0}
+                                            onClick={() => handleDecrement(po.id, p.id, displayVal)}
+                                            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-base font-medium"
+                                          >−</button>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={displayVal}
+                                            onChange={e => handleQtyChange(po.id, p.id, e.target.value)}
+                                            className="w-12 h-8 text-center text-sm font-semibold text-slate-800 bg-white border-x border-slate-200 focus:outline-none focus:bg-indigo-50 transition-colors [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => handleIncrement(po.id, p.id, displayVal)}
+                                            className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors text-base font-medium"
+                                          >+</button>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMatchProduct(po.id, p.id, p.orderQty)}
+                                          disabled={activeVal === p.orderQty}
+                                          className="text-xs text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 px-2.5 py-1 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors bg-indigo-50 hover:bg-indigo-100 font-medium"
+                                        >Match</button>
+                                      </div>
+                                    ) : (
+                                      <span className="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                        {p.dbReceivedQty}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3.5 text-center">
+                                    <DiffBadge diff={diff} />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Footer */}
+                      {activeTab === "pending" && (
+                        <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/60 space-y-3">
+                          {/* Remarks */}
+                          <div className="space-y-1.5">
+                            <label htmlFor={`remarks-${po.id}`} className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                              <MessageSquare size={12} /> Remarks <span className="text-slate-400 font-normal">(optional)</span>
+                            </label>
+                            <textarea
+                              id={`remarks-${po.id}`}
+                              rows={2}
+                              placeholder="Shortage notes, damages, delays…"
+                              value={editingRemarks[po.id] !== undefined ? editingRemarks[po.id] : (po.receiver_remarks || "")}
+                              onChange={e => handleRemarksChange(po.id, e.target.value)}
+                              className="w-full text-sm text-slate-700 placeholder-slate-400 bg-white border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleMatchAllForPo(po, pendingProducts)}
+                              className="text-sm font-medium text-slate-600 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 px-4 py-2 rounded-lg bg-white hover:bg-indigo-50 transition-all"
+                            >
+                              Match all
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingPoId === po.id}
+                              onClick={() => handleSavePo(po, products)}
+                              className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 px-5 py-2 rounded-lg transition-colors shadow-sm"
+                            >
+                              <Save size={14} />
+                              {savingPoId === po.id ? "Saving…" : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Read-only remarks for history */}
+                      {activeTab === "history" && po.receiver_remarks && (
+                        <div className="flex gap-2.5 px-5 py-3 border-t border-slate-100 bg-slate-50/60">
+                          <MessageSquare size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-slate-600">
+                            <span className="font-medium text-slate-700">Note: </span>{po.receiver_remarks}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
-      
-      {/* Toast Notification Container */}
+
       <Toast toasts={toasts} removeToast={removeToast} />
     </div>
   );
