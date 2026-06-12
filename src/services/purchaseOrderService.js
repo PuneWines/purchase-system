@@ -218,6 +218,7 @@ export const fetchItemList = async () => {
       .from("item_list")
       .select("id, item_name, bc_s, ml_s")
       .order("item_name", { ascending: true })
+      .order("id", { ascending: true })
       .range(page * pageSize, (page + 1) * pageSize - 1);
 
     if (error) throw error;

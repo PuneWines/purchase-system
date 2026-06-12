@@ -10,6 +10,8 @@ const TransporterVerification = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
   const { selectedShop } = useShopStore();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -140,17 +142,6 @@ const TransporterVerification = () => {
         }
       },
       { 
-        key: "pickup_date", 
-        label: "Pick-up Date", 
-        sortable: true,
-        render: (date, row) => {
-          if (row.transporter_status === "no") return <span style={{ color: "#94a3b8" }}>—</span>;
-          return date ? new Date(date).toLocaleDateString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric"
-          }) : <span style={{ color: "#94a3b8" }}>—</span>;
-        }
-      },
-      { 
         key: "delivery_date", 
         label: "Est. Delivery", 
         sortable: true,
@@ -184,10 +175,24 @@ const TransporterVerification = () => {
   }, [activeTab]);
 
   const filteredData = useMemo(() => {
-    const nonKunalData = data.filter(item => item.shop_name?.toUpperCase() !== "KUNAL");
-    if (selectedShop === "All") return nonKunalData;
-    return nonKunalData.filter(item => item.shop_name === selectedShop);
-  }, [data, selectedShop]);
+    let result = data.filter(item => item.shop_name?.toUpperCase() !== "KUNAL");
+    if (selectedShop !== "All") {
+      result = result.filter(item => item.shop_name === selectedShop);
+    }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      result = result.filter(item => new Date(item.created_at) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter(item => new Date(item.created_at) <= end);
+    }
+
+    return result;
+  }, [data, selectedShop, startDate, endDate]);
 
   const pendingData = useMemo(() => {
     return filteredData.filter(item => item.transporter_status !== "yes" && item.transporter_status !== "no" && item.trader_status !== "no");
@@ -240,6 +245,75 @@ const TransporterVerification = () => {
         >
           History ({historyData.length})
         </button>
+      </div>
+
+      {/* Date Filter */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        flexWrap: 'wrap',
+        marginBottom: '24px',
+        padding: '12px 16px',
+        backgroundColor: '#f8fafc',
+        borderRadius: '10px',
+        border: '1px solid #e2e8f0',
+        width: 'fit-content'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>From:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#1e293b',
+              outline: 'none',
+              fontWeight: '500'
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>To:</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              fontSize: '13px',
+              color: '#1e293b',
+              outline: 'none',
+              fontWeight: '500'
+            }}
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => { setStartDate(""); setEndDate(""); }}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#f1f5f9',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: '600',
+              color: '#475569',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+          >
+            Clear Dates
+          </button>
+        )}
       </div>
 
       {isLoading ? (

@@ -32,6 +32,12 @@ const Approval = () => {
   const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const modalItems = selectedIndentId ? (groupedApprovals[selectedIndentId] || []) : [];
+  const activeBatchItems = modalItems.filter(item => !item.is_excluded);
+  const approvedCount = activeBatchItems.filter(item => indentStatuses[item.id] === 'approved').length;
+  const rejectedCount = activeBatchItems.filter(item => indentStatuses[item.id] === 'rejected').length;
+  const pendingCount = activeBatchItems.filter(item => !indentStatuses[item.id] || indentStatuses[item.id] === 'pending').length;
+
   useEffect(() => {
     if (!selectedIndentId) {
       setShowExcludedModal(false);
@@ -246,12 +252,14 @@ const Approval = () => {
             .select("*, indents!inner(shop_name)")
             .eq("indents.shop_name", selectedShop)
             .order("created_at", { ascending: false })
+            .order("id", { ascending: true })
             .range(page * pageSize, (page + 1) * pageSize - 1);
         } else {
           return supabase
             .from("indent_items")
             .select("*, indents(shop_name)")
             .order("created_at", { ascending: false })
+            .order("id", { ascending: true })
             .range(page * pageSize, (page + 1) * pageSize - 1);
         }
       });
@@ -874,9 +882,19 @@ const Approval = () => {
                 <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#0f172a' }}>
                   Details for {selectedIndentId?.includes('::') ? selectedIndentId.split('::')[1] : selectedIndentId}
                 </h2>
-                <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
-                  Party: {groupedApprovals[selectedIndentId]?.[0]?.party_name || "Unknown"}
-                </p>
+                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span>Party: {groupedApprovals[selectedIndentId]?.[0]?.party_name || "Unknown"}</span>
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#cbd5e1' }}></span>
+                    <span style={{ color: '#16a34a', fontWeight: '600' }}>Approved: {approvedCount}</span>
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#cbd5e1' }}></span>
+                    <span style={{ color: '#dc2626', fontWeight: '600' }}>Rejected: {rejectedCount}</span>
+                    {activeTab !== 'history' && (
+                      <>
+                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#cbd5e1' }}></span>
+                        <span style={{ color: '#eab308', fontWeight: '600' }}>Unchecked: {pendingCount}</span>
+                      </>
+                    )}
+                  </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {activeTab !== 'history' && (

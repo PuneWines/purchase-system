@@ -252,6 +252,7 @@ const Indent = () => {
           .from("indent_items")
           .select("indent_id, is_excluded")
           .in("indent_id", indentIds)
+          .order("id", { ascending: true })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (pageError) throw pageError;
@@ -276,6 +277,7 @@ const Indent = () => {
           .from("approved_indent_items")
           .select("indent_id")
           .in("indent_id", indentIds)
+          .order("id", { ascending: true })
           .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
 
         if (pageError) throw pageError;
@@ -634,6 +636,7 @@ const Indent = () => {
           .select('*')
           .eq('indent_id', history.id)
           .eq('is_excluded', false)
+          .order('id', { ascending: true })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) throw error;
@@ -658,6 +661,7 @@ const Indent = () => {
           .from('approved_indent_items')
           .select('*')
           .eq('indent_id', history.id)
+          .order('id', { ascending: true })
           .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
 
         if (error) throw error;
@@ -711,6 +715,7 @@ const Indent = () => {
           .from('indent_items')
           .select('unique_indent_id')
           .eq('indent_id', indentId)
+          .order('id', { ascending: true })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (itemsError) throw itemsError;
@@ -884,6 +889,7 @@ const Indent = () => {
             .select('*')
             .eq('indent_id', indentId)
             .eq('is_excluded', false)
+            .order('id', { ascending: true })
             .range(page * pageSize, (page + 1) * pageSize - 1);
 
           if (refError) throw refError;
@@ -907,6 +913,7 @@ const Indent = () => {
             .from('approved_indent_items')
             .select('*')
             .eq('indent_id', indentId)
+            .order('id', { ascending: true })
             .range(approvedPage * pageSize, (approvedPage + 1) * pageSize - 1);
 
           if (refError) throw refError;

@@ -16,6 +16,7 @@ export const fetchAllPurchaseOrders = async () => {
       .from("purchase_orders")
       .select("*")
       .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
     if (error) throw error;

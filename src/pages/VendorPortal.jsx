@@ -4,7 +4,8 @@ import { supabase } from "../../utils/supabase";
 import { 
   FileText, CheckCircle2, Loader2, AlertCircle, 
   ChevronDown, ChevronUp, Check, X, Calendar, 
-  Hash, MessageSquare, ArrowRight, ShoppingBag 
+  Hash, MessageSquare, ArrowRight, ShoppingBag,
+  Share2, Download, Copy, ArrowLeft, Clock
 } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import "../styles/PurchaseOrder.css"; // Kept solely for off-screen PDF styling
@@ -83,6 +84,10 @@ const VendorPortal = () => {
   const [formErrors, setFormErrors] = useState({});
   const [successPoIds, setSuccessPoIds] = useState({});
 
+  // One-time Submission Preview
+  const [previewPoId, setPreviewPoId] = useState(null);
+  const [submittedAt, setSubmittedAt] = useState(null);
+
   // Memoized filter for pending purchase orders
   const pendingPoList = useMemo(() => {
     return poList.filter(po => po.trader_status !== "yes" && po.trader_status !== "no" && !successPoIds[po.id]);
@@ -118,13 +123,13 @@ const VendorPortal = () => {
 
       setVendorName(vendorRow.party_name);
 
-      // 3. Fetch POs matching this vendor name where vendor has not finished confirmation (trader_status is pending)
+      // 3. Fetch POs matching this vendor name
       const { data: pos, error: posError } = await supabase
         .from("purchase_orders")
         .select("*")
         .eq("vendor_name", vendorRow.party_name)
-        .or("trader_status.is.null,trader_status.eq.")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
 
       if (posError) throw posError;
       setPoList(pos || []);
@@ -416,6 +421,10 @@ const VendorPortal = () => {
       // Re-fetch PO list to update UI
       await fetchPortalData();
 
+      // Show submission preview screen immediately
+      setPreviewPoId(poId);
+      setSubmittedAt(new Date().toISOString());
+
     } catch (err) {
       console.error("Error submitting vendor portal confirmation:", err);
       setFormErrors(prev => ({ ...prev, [poId]: "Failed to submit. Please try again." }));
@@ -480,6 +489,25 @@ const VendorPortal = () => {
         <p className="text-slate-600 max-w-md">{error}</p>
       </div>
     );
+  }
+
+  if (previewPoId) {
+    const previewPo = poList.find(p => p.id === previewPoId);
+    if (previewPo) {
+      return (
+        <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto">
+            <SubmissionPreview
+              po={previewPo}
+              items={poItems[previewPoId] || []}
+              vendorName={vendorName}
+              submittedAt={submittedAt}
+              onClose={() => setPreviewPoId(null)}
+            />
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
@@ -976,6 +1004,299 @@ const VendorPortal = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const SubmissionPreview = ({ po, items, vendorName, submittedAt, onClose }) => {
+  const [copiedId, setCopiedId] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(po.id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleShare = async () => {
+    const shareText = `Vendor Submission Details:\nPO Number: ${po.po_number}\nVendor: ${vendorName}\nStatus: ${po.trader_status === 'yes' ? 'Confirmed' : 'Rejected'}\nTP Number: ${po.tp_number || 'N/A'}\nDispatch Date: ${po.dispatch_date ? new Date(po.dispatch_date).toLocaleString('en-IN') : 'N/A'}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `PO Submission - ${po.po_number}`,
+          text: shareText,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.warn("Share failed:", err);
+      }
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 2000);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    const element = document.getElementById("submission-preview-card");
+    if (!element) return;
+    
+    const opt = {
+      margin:       0.3,
+      filename:     `Submission_${po.po_number.replace(/\//g, "_")}.pdf`,
+      image:        { type: "jpeg", quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: "in", format: "letter", orientation: "portrait" }
+    };
+    
+    html2pdf().set(opt).from(element).save();
+  };
+
+  const isConfirmed = po.trader_status === "yes";
+  const formattedSubmittedAt = submittedAt 
+    ? new Date(submittedAt).toLocaleString("en-IN", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true
+      }) 
+    : "—";
+
+  const totalQty = po.total_order_qty || 0;
+  const totalBox = po.total_order_box || 0;
+
+  return (
+    <div className="animate-fade-in space-y-6 max-w-3xl mx-auto py-2">
+      {/* Action Bar (Top) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <button
+          onClick={onClose}
+          className="inline-flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl transition-all cursor-pointer border border-slate-200"
+        >
+          <ArrowLeft size={16} /> Back to Portal
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyId}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer relative"
+          >
+            <Copy size={14} /> 
+            {copiedId ? "Copied!" : "Copy ID"}
+          </button>
+          <button
+            onClick={handleShare}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+          >
+            <Share2 size={14} />
+            {shareSuccess ? "Link Copied!" : "Share"}
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+          >
+            <Download size={14} /> PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Main Preview Card */}
+      <div 
+        id="submission-preview-card" 
+        className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden transition-all p-6 md:p-8 space-y-8"
+      >
+        {/* Banner */}
+        <div className={`p-6 rounded-2xl flex flex-col items-center text-center gap-3 ${
+          isConfirmed 
+            ? "bg-emerald-50/80 border border-emerald-100" 
+            : "bg-red-50/80 border border-red-100"
+        }`}>
+          <div className={`p-3 rounded-full ${
+            isConfirmed ? "bg-emerald-100 text-emerald-600 animate-pulse" : "bg-red-100 text-red-600"
+          }`}>
+            <CheckCircle2 size={40} />
+          </div>
+          <div>
+            <h2 className={`text-xl font-extrabold ${isConfirmed ? "text-emerald-950" : "text-red-950"}`}>
+              {isConfirmed ? "Submission Confirmed" : "Submission Rejected"}
+            </h2>
+            <p className={`text-sm font-semibold mt-1 max-w-md ${isConfirmed ? "text-emerald-800" : "text-red-800"}`}>
+              {isConfirmed 
+                ? "Your expected dispatch date and verification details have been successfully recorded."
+                : "This Purchase Order has been marked as rejected."}
+            </p>
+          </div>
+          <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+            isConfirmed 
+              ? "bg-emerald-100/80 text-emerald-800 border-emerald-300" 
+              : "bg-red-100/80 text-red-800 border-red-300"
+          }`}>
+            {isConfirmed ? "Confirmed Successfully" : "Order Rejected"}
+          </span>
+        </div>
+
+        {/* Info Grid (Responsive) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-slate-100 pb-8">
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Order Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">PO Number</span>
+                <strong className="text-slate-900 font-bold text-sm block mt-0.5">{po.po_number}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Shop Name</span>
+                <strong className="text-slate-900 font-bold text-sm block mt-0.5">{po.shop_name || "N/A"}</strong>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Supplier Name</span>
+                <strong className="text-slate-900 font-bold text-sm block mt-0.5">{vendorName}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Submission Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Timestamp</span>
+                <div className="flex items-center gap-1 mt-0.5 text-slate-700 text-sm font-semibold">
+                  <Clock size={14} className="text-slate-400" />
+                  <span>{formattedSubmittedAt}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Submission ID</span>
+                <span className="text-xs font-mono text-slate-500 block mt-0.5 select-all truncate max-w-[150px]" title={po.id}>
+                  {po.id}
+                </span>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Status Code</span>
+                <span className="text-xs font-semibold text-slate-700 block mt-0.5 uppercase">
+                  {po.trader_status === "yes" ? "TRADER_CONFIRMED" : "TRADER_REJECTED"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Verification details */}
+        {isConfirmed && (
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2">
+              Verification Details
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">TP Number</span>
+                <strong className="text-slate-900 font-bold text-sm block mt-1 break-words">
+                  {po.tp_number || "—"}
+                </strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Expected Dispatch Date & Time</span>
+                <strong className="text-slate-900 font-bold text-sm block mt-1">
+                  {po.dispatch_date ? new Date(po.dispatch_date).toLocaleString("en-IN", {
+                    day: "2-digit", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit", hour12: true
+                  }) : "—"}
+                </strong>
+              </div>
+              {po.remarks && (
+                <div className="sm:col-span-2 border-t border-slate-200/60 pt-4">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Remarks / Notes</span>
+                  <p className="text-slate-700 text-sm mt-1 whitespace-pre-wrap break-words leading-relaxed">
+                    {po.remarks}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Rejection Details */}
+        {!isConfirmed && po.remarks && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-6">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-red-800 border-b border-red-200 pb-2">
+              Rejection Details
+            </h3>
+            <div className="mt-3">
+              <span className="text-[10px] text-red-500 uppercase font-bold tracking-wider block">Reason for Rejection</span>
+              <p className="text-red-950 text-sm mt-1 whitespace-pre-wrap break-words leading-relaxed font-medium">
+                {po.remarks}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Verified Items List */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Verified Items ({items.length})</h3>
+            <span className="text-xs text-slate-500 font-bold">
+              Total Qty: {totalQty} Bottles {totalBox > 0 ? `(${totalBox} Boxes)` : ""}
+            </span>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="divide-y divide-slate-200/60">
+              {items.map((item, index) => {
+                const itemDec = (po.trader_item_statuses || {})[item.id] || "approved";
+                const isItemApproved = itemDec === "approved";
+
+                return (
+                  <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xs font-bold text-slate-400 mt-0.5">{index + 1}</span>
+                      <div>
+                        <strong className="text-slate-900 font-bold text-sm block">{item.itemName}</strong>
+                        <span className="text-xs text-slate-500 block mt-0.5">
+                          {item.brandName} • {item.shopName}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto">
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Qty / Unit</span>
+                        <strong className="text-slate-950 font-bold text-sm">
+                          {item.displayQty} {item.qtyType}
+                        </strong>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold">
+                        {isItemApproved ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 bg-emerald-100/80 border border-emerald-200 px-2.5 py-1 rounded-full">
+                            <Check size={12} strokeWidth={3} /> Approved
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-red-600 bg-red-100/80 border border-red-200 px-2.5 py-1 rounded-full">
+                            <X size={12} strokeWidth={3} /> Rejected
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center pt-4 border-t border-slate-100">
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+            DRINQKART SUPPLIER VERIFICATION PORTAL • SHOT FOR RECORD
+          </p>
+        </div>
+      </div>
+
+      {/* Action Bar (Bottom) */}
+      <div className="flex justify-center pt-2">
+        <button
+          onClick={onClose}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer"
+        >
+          <ArrowLeft size={16} /> Return to Portal Dashboard
+        </button>
+      </div>
     </div>
   );
 };
