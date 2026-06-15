@@ -71,6 +71,8 @@ const POHistory = () => {
   // Search & filter
   const [searchQuery, setSearchQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Sort
   const [sortField, setSortField] = useState("created_at");
@@ -139,6 +141,16 @@ const POHistory = () => {
       );
     }
 
+    // Date range filter
+    if (startDate) {
+      const startMs = new Date(startDate).setHours(0, 0, 0, 0);
+      list = list.filter((o) => new Date(o.created_at).getTime() >= startMs);
+    }
+    if (endDate) {
+      const endMs = new Date(endDate).setHours(23, 59, 59, 999);
+      list = list.filter((o) => new Date(o.created_at).getTime() <= endMs);
+    }
+
     // Sort
     list.sort((a, b) => {
       let va = a[sortField];
@@ -161,7 +173,7 @@ const POHistory = () => {
     });
 
     return list;
-  }, [shopFilteredOrders, vendorFilter, searchQuery, sortField, sortDir]);
+  }, [shopFilteredOrders, vendorFilter, searchQuery, sortField, sortDir, startDate, endDate]);
 
   /* ── Pagination ───────────────────────────────────────────── */
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ROWS_PER_PAGE));
@@ -169,7 +181,7 @@ const POHistory = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, vendorFilter, sortField, sortDir, selectedShop]);
+  }, [searchQuery, vendorFilter, sortField, sortDir, selectedShop, startDate, endDate]);
 
   const paginatedOrders = useMemo(() => {
     const start = (currentPage - 1) * ROWS_PER_PAGE;
@@ -310,6 +322,35 @@ const POHistory = () => {
               </option>
             ))}
           </select>
+
+          <div className="poh-date-filters">
+            <span className="poh-date-label">From:</span>
+            <input
+              type="date"
+              className="poh-date-input"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            <span className="poh-date-label">To:</span>
+            <input
+              type="date"
+              className="poh-date-input"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+            {(startDate || endDate) && (
+              <button
+                className="poh-clear-date-btn"
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                title="Clear date filter"
+              >
+                Clear Dates
+              </button>
+            )}
+          </div>
 
           <span className="poh-results-count">
             {filteredOrders.length} result{filteredOrders.length !== 1 ? "s" : ""}

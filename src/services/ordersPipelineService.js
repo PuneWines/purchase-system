@@ -10,6 +10,8 @@ export const fetchPipelineOrders = async ({
   status = "All",
   search = "",
   sortBy = "date-desc",
+  startDate = "",
+  endDate = "",
 }) => {
   let query = supabase.from("purchase_orders").select("*");
 
@@ -24,6 +26,16 @@ export const fetchPipelineOrders = async ({
     query = query.or(
       `po_number.ilike.${q},vendor_name.ilike.${q},shop_name.ilike.${q},first_brand_name.ilike.${q}`
     );
+  }
+
+  // Apply date range filter
+  if (startDate) {
+    const startLocal = new Date(`${startDate}T00:00:00`);
+    query = query.gte("created_at", startLocal.toISOString());
+  }
+  if (endDate) {
+    const endLocal = new Date(`${endDate}T23:59:59.999`);
+    query = query.lte("created_at", endLocal.toISOString());
   }
 
   // Apply status filter mapping
@@ -190,13 +202,23 @@ export const fetchPipelineOrders = async ({
 /**
  * Fetch a lightweight list of PO statuses for generating global KPI cards.
  */
-export const fetchPipelineStats = async ({ shop = "All" }) => {
+export const fetchPipelineStats = async ({ shop = "All", startDate = "", endDate = "" }) => {
   let query = supabase
     .from("purchase_orders")
     .select("trader_status, transporter_status, receiver_status, trader_item_statuses, shop_name");
 
   if (shop && shop !== "All") {
     query = query.eq("shop_name", shop);
+  }
+
+  // Apply date range filter
+  if (startDate) {
+    const startLocal = new Date(`${startDate}T00:00:00`);
+    query = query.gte("created_at", startLocal.toISOString());
+  }
+  if (endDate) {
+    const endLocal = new Date(`${endDate}T23:59:59.999`);
+    query = query.lte("created_at", endLocal.toISOString());
   }
 
   const { data, error } = await query;

@@ -478,3 +478,57 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ── Date Filters ────────────────────────────────────────────── */
+.poh-date-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.poh-date-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #5e6c84);
+  font-weight: 600;
+}
+
+.poh-date-input {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-dark, #c1c7d0);
+  border-radius: 4px;
+  font-family: var(--font-primary, "Nunito", sans-serif);
+  font-size: 0.875rem;
+  color: var(--color-text-main, #172b4d);
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease;
+  cursor: pointer;
+  box-sizing: border-box;
+  height: 38px;
+}
+
+.poh-date-input:focus {
+  border-color: var(--color-primary, #0052cc);
+  box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.2);
+}
+
+.poh-clear-date-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-dark, #c1c7d0);
+  border-radius: 4px;
+  font-family: var(--font-primary, "Nunito", sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #f4f5f7;
+  color: var(--color-text-main, #172b4d);
+  transition: background 0.12s ease;
+  height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.poh-clear-date-btn:hover {
+  background: #ebecf0;
+}

@@ -33,6 +33,8 @@ const OrdersPipeline = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("date-desc");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   
   const [expandedOrders, setExpandedOrders] = useState({});
   const [selectedPO, setSelectedPO] = useState(null); // For detail inspector drawer
@@ -58,8 +60,8 @@ const OrdersPipeline = () => {
     refetch: refetchStats,
     error: statsError,
   } = useQuery({
-    queryKey: ["pipelineStats", selectedShop],
-    queryFn: () => fetchPipelineStats({ shop: selectedShop }),
+    queryKey: ["pipelineStats", selectedShop, startDate, endDate],
+    queryFn: () => fetchPipelineStats({ shop: selectedShop, startDate, endDate }),
     staleTime: 60000,
   });
 
@@ -74,7 +76,7 @@ const OrdersPipeline = () => {
     refetch: refetchOrders,
     error: ordersError,
   } = useInfiniteQuery({
-    queryKey: ["pipelineOrders", selectedShop, statusFilter, debouncedSearch, sortBy],
+    queryKey: ["pipelineOrders", selectedShop, statusFilter, debouncedSearch, sortBy, startDate, endDate],
     queryFn: ({ pageParam = 0 }) => fetchPipelineOrders({
       limit: LIMIT,
       offset: pageParam,
@@ -82,6 +84,8 @@ const OrdersPipeline = () => {
       status: statusFilter,
       search: debouncedSearch,
       sortBy: sortBy,
+      startDate,
+      endDate,
     }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
@@ -430,13 +434,43 @@ const OrdersPipeline = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-700 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full sm:w-auto"
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-700 bg-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full sm:w-auto shrink-0"
             >
               <option value="date-desc">Newest First</option>
               <option value="date-asc">Oldest First</option>
               <option value="po-asc">PO Number (A-Z)</option>
               <option value="po-desc">PO Number (Z-A)</option>
             </select>
+
+            {/* Date Filters */}
+            <div className="flex items-center gap-2 border border-slate-200 rounded-lg p-1.5 bg-slate-50/50 text-xs text-slate-600 font-semibold w-full sm:w-auto">
+              <span className="text-[10px] text-slate-400 uppercase font-bold pl-1">From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent border-0 focus:outline-none text-slate-800 font-bold cursor-pointer"
+              />
+              <span className="text-[10px] text-slate-400 uppercase font-bold">To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent border-0 focus:outline-none text-slate-800 font-bold cursor-pointer"
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                  className="px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded cursor-pointer transition-all"
+                  title="Clear dates"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Quick Filter Pills */}
