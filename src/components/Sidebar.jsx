@@ -19,6 +19,7 @@ import {
   Zap,
   Store,
   History,
+  GitFork,
 } from "lucide-react";
 import "../styles/Sidebar.css";
 
@@ -37,6 +38,7 @@ const menuGroups = [
       { key: "approval", label: "Approval", icon: <CheckSquare size={18} />, path: "/approval" },
       { key: "po", label: "PO", icon: <Package size={18} />, path: "/po" },
       { key: "po_history", label: "PO History", icon: <History size={18} />, path: "/po-history" },
+      { key: "orders_pipeline", label: "Orders Pipeline", icon: <GitFork size={18} />, path: "/orders-pipeline" },
     ],
   },
   {

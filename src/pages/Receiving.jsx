@@ -219,16 +219,14 @@ const Receiving = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  activeTab === tab.key
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === tab.key
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
-                }`}
+                  }`}
               >
                 {tab.label}
-                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  activeTab === tab.key ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-500"
-                }`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${activeTab === tab.key ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-500"
+                  }`}>
                   {tab.count}
                 </span>
               </button>

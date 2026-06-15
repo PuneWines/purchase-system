@@ -126,6 +126,7 @@ const Settings = () => {
     { key: "trader_verification", label: "Trader Verification" },
     { key: "transporter_verification", label: "Transporter Verification" },
     { key: "receiving", label: "Receiving" },
+    { key: "orders_pipeline", label: "Orders Pipeline" },
     { key: "setting", label: "Settings" },
   ];
 

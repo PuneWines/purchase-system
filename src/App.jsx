@@ -11,6 +11,7 @@ import POHistory from "./pages/POHistory";
 import TraderVerification from "./pages/TraderVerification";
 import TransporterVerification from "./pages/TransporterVerification";
 import Receiving from "./pages/Receiving";
+import OrdersPipeline from "./pages/OrdersPipeline";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import VendorConfirmation from "./pages/VendorConfirmation";
@@ -74,6 +75,7 @@ const AppContent = () => {
             <Route path="/trader_verification" element={<ProtectedRoute><TraderVerification /></ProtectedRoute>} />
             <Route path="/transporter_verification" element={<ProtectedRoute><TransporterVerification /></ProtectedRoute>} />
             <Route path="/receiving" element={<ProtectedRoute><Receiving /></ProtectedRoute>} />
+            <Route path="/orders-pipeline" element={<ProtectedRoute><OrdersPipeline /></ProtectedRoute>} />
             <Route path="/setting" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
