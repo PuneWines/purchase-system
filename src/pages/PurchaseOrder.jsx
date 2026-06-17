@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Printer, ShoppingCart, FileText, Trash2 } from "lucide-react";
 import useCompanyStore from "../store/useCompanyStore";
@@ -64,6 +64,36 @@ const PurchaseOrder = () => {
   const [newItemQty, setNewItemQty] = useState("");
   const [itemList, setItemList] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [itemOverrides, setItemOverrides] = useState({});
+
+  const normalizePoItem = (item) => {
+    const closingQty = item.closingQty != null && item.closingQty !== ""
+      ? parseFloat(item.closingQty) || 0
+      : item.closingQty;
+    const rawOrderBox = item.orderBox != null && item.orderBox !== ""
+      ? parseFloat(item.orderBox) || 0
+      : 0;
+    const rawOrderQty = item.orderQty != null && item.orderQty !== ""
+      ? parseFloat(item.orderQty) || 0
+      : 0;
+    const originalQtyType = item.originalQtyType || item.qtyType || (rawOrderBox >= 0.9 ? "Box" : "Bottles");
+    const qtyType = originalQtyType;
+    const orderBox = qtyType === "Box" ? Math.round(rawOrderBox) : rawOrderBox;
+    const orderQty = qtyType === "Bottles" ? Math.ceil(rawOrderQty) : rawOrderQty;
+    const displayQty = qtyType === "Box"
+      ? Math.round(orderBox).toString()
+      : Math.ceil(orderQty).toString();
+
+    return {
+      ...item,
+      closingQty,
+      orderBox,
+      orderQty,
+      originalQtyType,
+      qtyType,
+      displayQty
+    };
+  };
 
   // Reset states when active vendor changes or PO mode changes
   useEffect(() => {
@@ -72,6 +102,7 @@ const PurchaseOrder = () => {
     setNewItemBox("");
     setNewItemQty("");
     setSelectedItem(null);
+    setItemOverrides({});
   }, [activeParty, poMode]);
 
   const queryClient = useQueryClient();
@@ -174,6 +205,11 @@ const PurchaseOrder = () => {
       list = rawItems.filter(item => !removedItemIds.has(item.id));
     }
 
+    list = list.map(item => normalizePoItem({
+      ...item,
+      ...(itemOverrides[item.id] || {})
+    }));
+
     // Sort items by name (ascending) first, then by ML quantity (ascending)
     return list.sort((a, b) => {
       const nameA = (a.itemName || "").trim();
@@ -185,7 +221,51 @@ const PurchaseOrder = () => {
       const mlB = parseFloat(b.mls !== undefined ? b.mls : b.ml_s) || 0;
       return mlA - mlB;
     });
-  }, [filteredApprovedItems, activeParty, removedItemIds, poMode, manualItems]);
+  }, [filteredApprovedItems, activeParty, removedItemIds, poMode, manualItems, itemOverrides]);
+
+  const handleUpdatePoItem = (itemId, field, value) => {
+    const currentItem = itemsForActiveParty.find(item => item.id === itemId);
+    if (!currentItem) return;
+
+    const nextValue = value === "" ? "" : value;
+    let nextItem = {
+      ...currentItem,
+      ...(itemOverrides[itemId] || {}),
+      [field]: nextValue
+    };
+
+    const bcs = parseFloat(nextItem.bcs ?? nextItem.bc_s) || 0;
+
+    if (field === "orderBox") {
+      const parsedBox = value === "" ? "" : parseFloat(value) || 0;
+      nextItem.orderBox = parsedBox;
+      if (bcs) {
+        nextItem.orderQty = value === "" ? "" : Math.round((parseFloat(value) || 0) * bcs);
+      }
+    }
+
+    if (field === "orderQty") {
+      const parsedQty = value === "" ? "" : parseFloat(value) || 0;
+      nextItem.orderQty = parsedQty;
+      if (bcs) {
+        nextItem.orderBox = value === "" ? "" : parseFloat((parsedQty / bcs).toFixed(4));
+      }
+    }
+
+    const normalizedItem = normalizePoItem(nextItem);
+
+    setItemOverrides(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        closingQty: normalizedItem.closingQty,
+        orderBox: normalizedItem.orderBox,
+        orderQty: normalizedItem.orderQty,
+        qtyType: normalizedItem.qtyType,
+        displayQty: normalizedItem.displayQty
+      }
+    }));
+  };
 
   const handleRemoveItem = (itemId) => {
     if (poMode === "manual") {
@@ -806,13 +886,13 @@ const PurchaseOrder = () => {
               setSelectedReceiver={setSelectedReceiver}
               shippingError={shippingError}
               onRemoveItem={handleRemoveItem}
+              onUpdateItem={handleUpdatePoItem}
               onDeleteVendor={poMode === "manual" ? null : handleDeleteVendor}
               poMode={poMode}
               itemList={itemList}
               selectedItem={selectedItem}
               onItemSelect={handleItemSelection}
               newItemName={newItemName}
-              setNewItemName={setNewItemName}
               newItemBox={newItemBox}
               onBoxQtyChange={handleBoxQtyChange}
               newItemQty={newItemQty}
@@ -828,4 +908,3 @@ const PurchaseOrder = () => {
 };
 
 export default PurchaseOrder;
-

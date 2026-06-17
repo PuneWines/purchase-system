@@ -1,15 +1,29 @@
-import React from "react";
 import { Trash2 } from "lucide-react";
 
-const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem }) => {
+const inputCellStyle = {
+  width: "100%",
+  minWidth: "72px",
+  padding: "6px 8px",
+  border: "1px solid #cbd5e1",
+  borderRadius: "6px",
+  textAlign: "center",
+  fontSize: "13px",
+  fontWeight: "600",
+  color: "#1e293b",
+  backgroundColor: "#ffffff",
+  outline: "none",
+  boxSizing: "border-box"
+};
+
+const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem, onUpdateItem }) => {
   const orderQtyRows = items;
 
   const totalBoxes = orderQtyRows
-    .filter(r => r.qtyType === "Box")
+    .filter((r) => r.qtyType === "Box")
     .reduce((s, r) => s + (r.orderBox || 0), 0);
 
   const totalBottles = orderQtyRows
-    .filter(r => r.qtyType === "Bottles")
+    .filter((r) => r.qtyType === "Bottles")
     .reduce((s, r) => s + (r.orderQty || 0), 0);
 
   const displayTotalBoxes = totalBoxes % 1 === 0 ? totalBoxes.toString() : totalBoxes.toFixed(2);
@@ -38,15 +52,48 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem }) => {
                 <td><strong>{item.shopName || "—"}</strong></td>
                 <td><strong>{item.itemName || "—"}</strong></td>
                 <td className="po-text-center">
-                  {item.closingQty != null ? item.closingQty : "—"}
+                  {onUpdateItem ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={item.closingQty ?? ""}
+                      onChange={(e) => onUpdateItem(item.id, "closingQty", e.target.value)}
+                      style={inputCellStyle}
+                    />
+                  ) : (
+                    item.closingQty != null ? item.closingQty : "—"
+                  )}
                 </td>
-                <td className="po-text-center" style={item.qtyType === "Box" ? { fontWeight: '600' } : {}}>
-                  {item.qtyType === "Box" ? item.displayQty : "—"}
+                <td className="po-text-center" style={item.qtyType === "Box" ? { fontWeight: "600" } : {}}>
+                  {onUpdateItem && item.originalQtyType === "Box" ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.orderBox ?? ""}
+                      onChange={(e) => onUpdateItem(item.id, "orderBox", e.target.value)}
+                      style={inputCellStyle}
+                    />
+                  ) : (
+                    item.qtyType === "Box" ? item.displayQty : "—"
+                  )}
                 </td>
-                <td className="po-text-center" style={item.qtyType === "Bottles" ? { fontWeight: '600' } : {}}>
-                  {item.qtyType === "Bottles" ? item.displayQty : "—"}
+                <td className="po-text-center" style={item.qtyType === "Bottles" ? { fontWeight: "600" } : {}}>
+                  {onUpdateItem && item.originalQtyType === "Bottles" ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={item.orderQty ?? ""}
+                      onChange={(e) => onUpdateItem(item.id, "orderQty", e.target.value)}
+                      style={inputCellStyle}
+                    />
+                  ) : (
+                    item.qtyType === "Bottles" ? item.displayQty : "—"
+                  )}
                 </td>
-                <td className="po-text-center" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                <td className="po-text-center" style={{ color: "#64748b", fontSize: "0.8rem" }}>
                   {item.qtyType || "—"}
                 </td>
                 {!isReceiver && onRemoveItem && (
@@ -56,19 +103,19 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem }) => {
                       className="po-item-delete-btn"
                       title="Remove item"
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '4px',
-                        transition: 'background-color 0.2s'
+                        background: "none",
+                        border: "none",
+                        color: "#ef4444",
+                        cursor: "pointer",
+                        padding: "4px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "4px",
+                        transition: "background-color 0.2s"
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#fee2e2"}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -76,21 +123,20 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem }) => {
                 )}
               </tr>
             ))}
-            
-            {/* Aligned Total Row inside Table */}
+
             {orderQtyRows.length > 0 && (
-              <tr style={{ fontWeight: 'bold', borderTop: '2px solid #94a3b8', backgroundColor: '#f8fafc' }}>
-                <td colSpan={4} style={{ textAlign: 'right', padding: '10px 16px' }}><strong>Total:</strong></td>
-                <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBoxes}</td>
-                <td className="po-text-center" style={{ padding: '10px 16px', fontWeight: '700', color: '#1e1b4b' }}>{displayTotalBottles}</td>
-                <td className="po-text-center" style={{ padding: '10px 16px' }}></td>
-                {!isReceiver && onRemoveItem && <td className="po-text-center" style={{ padding: '10px 16px' }}></td>}
+              <tr style={{ fontWeight: "bold", borderTop: "2px solid #94a3b8", backgroundColor: "#f8fafc" }}>
+                <td colSpan={4} style={{ textAlign: "right", padding: "10px 16px" }}><strong>Total:</strong></td>
+                <td className="po-text-center" style={{ padding: "10px 16px", fontWeight: "700", color: "#1e1b4b" }}>{displayTotalBoxes}</td>
+                <td className="po-text-center" style={{ padding: "10px 16px", fontWeight: "700", color: "#1e1b4b" }}>{displayTotalBottles}</td>
+                <td className="po-text-center" style={{ padding: "10px 16px" }}></td>
+                {!isReceiver && onRemoveItem && <td className="po-text-center" style={{ padding: "10px 16px" }}></td>}
               </tr>
             )}
           </>
         ) : (
           <tr>
-            <td colSpan={!isReceiver && onRemoveItem ? 8 : 7} className="po-text-center" style={{ padding: '24px', color: '#64748b', fontStyle: 'italic' }}>
+            <td colSpan={!isReceiver && onRemoveItem ? 8 : 7} className="po-text-center" style={{ padding: "24px", color: "#64748b", fontStyle: "italic" }}>
               Please select a vendor above to view the items list.
             </td>
           </tr>

@@ -1,4 +1,3 @@
-import React from "react";
 import POHeader from "./POHeader";
 import POVendorBox from "./POVendorBox";
 import POShipToBox from "./POShipToBox";
@@ -26,13 +25,13 @@ const PurchaseOrderPreview = ({
   setSelectedReceiver,
   shippingError,
   onRemoveItem,
+  onUpdateItem,
   onDeleteVendor,
   poMode,
   itemList = [],
   selectedItem = null,
   onItemSelect,
   newItemName,
-  setNewItemName,
   newItemBox,
   onBoxQtyChange,
   newItemQty,
@@ -68,6 +67,7 @@ const PurchaseOrderPreview = ({
         items={items}
         isReceiver={false}
         onRemoveItem={onRemoveItem}
+        onUpdateItem={onUpdateItem}
       />
 
       {poMode === "manual" && partyName && (
