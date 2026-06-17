@@ -52,21 +52,10 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem, onUpdat
                 <td><strong>{item.shopName || "—"}</strong></td>
                 <td><strong>{item.itemName || "—"}</strong></td>
                 <td className="po-text-center">
-                  {onUpdateItem ? (
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={item.closingQty ?? ""}
-                      onChange={(e) => onUpdateItem(item.id, "closingQty", e.target.value)}
-                      style={inputCellStyle}
-                    />
-                  ) : (
-                    item.closingQty != null ? item.closingQty : "—"
-                  )}
+                  {item.closingQty != null ? item.closingQty : "—"}
                 </td>
                 <td className="po-text-center" style={item.qtyType === "Box" ? { fontWeight: "600" } : {}}>
-                  {onUpdateItem && item.originalQtyType === "Box" ? (
+                  {onUpdateItem ? (
                     <input
                       type="number"
                       min="0"
@@ -76,11 +65,11 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem, onUpdat
                       style={inputCellStyle}
                     />
                   ) : (
-                    item.qtyType === "Box" ? item.displayQty : "—"
+                    item.orderBox != null && item.orderBox !== "" ? item.orderBox : "—"
                   )}
                 </td>
                 <td className="po-text-center" style={item.qtyType === "Bottles" ? { fontWeight: "600" } : {}}>
-                  {onUpdateItem && item.originalQtyType === "Bottles" ? (
+                  {onUpdateItem ? (
                     <input
                       type="number"
                       min="0"
@@ -90,7 +79,7 @@ const POItemsTable = ({ partyName, items = [], isReceiver, onRemoveItem, onUpdat
                       style={inputCellStyle}
                     />
                   ) : (
-                    item.qtyType === "Bottles" ? item.displayQty : "—"
+                    item.orderQty != null && item.orderQty !== "" ? item.orderQty : "—"
                   )}
                 </td>
                 <td className="po-text-center" style={{ color: "#64748b", fontSize: "0.8rem" }}>

@@ -76,10 +76,9 @@ const PurchaseOrder = () => {
     const rawOrderQty = item.orderQty != null && item.orderQty !== ""
       ? parseFloat(item.orderQty) || 0
       : 0;
-    const originalQtyType = item.originalQtyType || item.qtyType || (rawOrderBox >= 0.9 ? "Box" : "Bottles");
-    const qtyType = originalQtyType;
-    const orderBox = qtyType === "Box" ? Math.round(rawOrderBox) : rawOrderBox;
-    const orderQty = qtyType === "Bottles" ? Math.ceil(rawOrderQty) : rawOrderQty;
+    const qtyType = rawOrderBox >= 0.9 ? "Box" : "Bottles";
+    const orderBox = rawOrderBox;
+    const orderQty = rawOrderQty;
     const displayQty = qtyType === "Box"
       ? Math.round(orderBox).toString()
       : Math.ceil(orderQty).toString();
@@ -89,7 +88,6 @@ const PurchaseOrder = () => {
       closingQty,
       orderBox,
       orderQty,
-      originalQtyType,
       qtyType,
       displayQty
     };
