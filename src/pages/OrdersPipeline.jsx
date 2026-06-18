@@ -3,6 +3,7 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchPipelineOrders, fetchPipelineStats } from "../services/ordersPipelineService";
 import useShopStore from "../store/useShopStore";
 import Toast, { useToast } from "../components/Toast";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 import {
   Search,
   RefreshCw,
@@ -43,6 +44,10 @@ const OrdersPipeline = () => {
 
   const LIMIT = 15;
 
+  // ── Supabase Realtime: auto-invalidate cache on DB changes ──
+  useRealtimeSync();
+
+
   // Debounce Search input to prevent lag while typing
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -62,7 +67,7 @@ const OrdersPipeline = () => {
   } = useQuery({
     queryKey: ["pipelineStats", selectedShop, startDate, endDate],
     queryFn: () => fetchPipelineStats({ shop: selectedShop, startDate, endDate }),
-    staleTime: 60000,
+    staleTime: Infinity, // Only refreshes when realtime fires or user clicks Refresh
   });
 
   // 2. Fetch paginated POs with infinite query
@@ -91,7 +96,7 @@ const OrdersPipeline = () => {
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === LIMIT ? allPages.length * LIMIT : undefined;
     },
-    staleTime: 60000,
+    staleTime: Infinity, // Only refreshes when realtime fires or user clicks Refresh
   });
 
   // Extract flat list of orders

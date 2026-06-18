@@ -16,9 +16,11 @@ import {
   ShoppingBag,
   Truck,
 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAllPurchaseOrders } from "../services/poHistoryService";
 import useShopStore from "../store/useShopStore";
 import "../styles/POHistory.css";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 
 const ROWS_PER_PAGE = 20;
 
@@ -63,8 +65,8 @@ const SkeletonRows = ({ count = 8 }) =>
 /* ── Main Component ──────────────────────────────────────────── */
 const POHistory = () => {
   const { selectedShop } = useShopStore();
-  const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -81,29 +83,35 @@ const POHistory = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  /* ── Data fetch ───────────────────────────────────────────── */
+  // ── Supabase Realtime: auto-invalidate cache on DB changes ──
+  useRealtimeSync();
+
+  /* ── Data fetch via React Query ──────────────────────── */
+  const {
+    data: orders = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["poHistory"],
+    queryFn: fetchAllPurchaseOrders,
+    staleTime: Infinity, // Only refresh when realtime fires
+  });
+
+  /* Manual refresh handler ────────────────────────── */
   const loadOrders = useCallback(async (showRefreshSpinner = false) => {
-    if (showRefreshSpinner) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
+    if (showRefreshSpinner) setIsRefreshing(true);
     setError(null);
     try {
-      const data = await fetchAllPurchaseOrders();
-      setOrders(data || []);
+      await refetch();
     } catch (err) {
       console.error("Error fetching PO history:", err);
       setError("Failed to load purchase order history. Please try again.");
     } finally {
-      setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [refetch]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+
 
   /* ── Unique vendor list for filter dropdown ───────────────── */
   /* ── Filtered by Global Shop Selector ────────────────────── */

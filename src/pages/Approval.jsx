@@ -4,6 +4,7 @@ import useShopStore from "../store/useShopStore";
 import "../styles/Pages.css";
 import { supabase } from "../../utils/supabase";
 import { Loader2, Archive, X, Eye, Search, Trash2 } from "lucide-react";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 
 const formatDateTime = (isoString) => {
   if (!isoString) return "—";
@@ -237,6 +238,9 @@ const Approval = () => {
     textAlign: 'right'
   };
   const queryClient = useQueryClient();
+
+  // ── Supabase Realtime: auto-invalidate cache on DB changes ──
+  useRealtimeSync();
 
   const { data: approvalsDataResponse, isLoading: isApprovalsQueryLoading } = useQuery({
     queryKey: ["approvalsData", selectedShop],

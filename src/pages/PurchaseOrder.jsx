@@ -29,6 +29,7 @@ import {
 } from "../services/purchaseOrderService";
 import { generatePdfBlob, uploadPdfBlob, previewPdfInNewTab } from "../services/pdfService";
 import { sendPOConfirmationMessage, sendTransporterConfirmationMessage, sendReceiverConfirmationMessage } from "../services/whatsappService";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 
 // Utilities
 import { transformActivePartyItems } from "../utils/poTransformer";
@@ -104,6 +105,10 @@ const PurchaseOrder = () => {
   }, [activeParty, poMode]);
 
   const queryClient = useQueryClient();
+
+  // ── Supabase Realtime: auto-invalidate cache on DB changes ──
+  useRealtimeSync();
+
 
   const { data: pageDataResponse, isLoading: isPageDataLoading } = useQuery({
     queryKey: ["purchaseOrderPageData"],
